@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-15 20:19:02.141705",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "weight_kg",
+  "age",
+  "gender",
+  "resting_heart_rate",
+  "units",
+  "default_activity",
+  "pace_format",
+  "calories_formula"
+ ],
+ "fields": [
+  {
+   "default": "70",
+   "fieldname": "weight_kg",
+   "fieldtype": "Float",
+   "label": "Weight (kg)",
+   "non_negative": 1
+  },
+  {
+   "default": "35",
+   "fieldname": "age",
+   "fieldtype": "Int",
+   "label": "Age",
+   "non_negative": 1
+  },
+  {
+   "default": "Male",
+   "fieldname": "gender",
+   "fieldtype": "Select",
+   "label": "Gender",
+   "options": "Male\nFemale\nOther"
+  },
+  {
+   "default": "60",
+   "fieldname": "resting_heart_rate",
+   "fieldtype": "Int",
+   "label": "Resting Heart Rate",
+   "non_negative": 1
+  },
+  {
+   "default": "km",
+   "fieldname": "units",
+   "fieldtype": "Select",
+   "label": "Units",
+   "options": "km\nmiles"
+  },
+  {
+   "default": "Running",
+   "fieldname": "default_activity",
+   "fieldtype": "Select",
+   "label": "Default Activity",
+   "options": "Running\nSwimming\nCycling"
+  },
+  {
+   "default": "min/km",
+   "fieldname": "pace_format",
+   "fieldtype": "Select",
+   "label": "Pace Format",
+   "options": "min/km\nmin/mile"
+  },
+  {
+   "default": "Estimated",
+   "fieldname": "calories_formula",
+   "fieldtype": "Select",
+   "label": "Calories Formula",
+   "options": "Estimated\nManual"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-15 20:24:10.829168",
+ "modified_by": "Administrator",
+ "module": "Running Journal",
+ "name": "RunSettings",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

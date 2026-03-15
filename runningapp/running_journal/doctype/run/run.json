@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:RUN-{YYYY}-{#####}",
+ "creation": "2026-03-15 20:25:49.111333",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "run_name",
+  "date",
+  "activity_type",
+  "location",
+  "distance_km",
+  "duration_sec",
+  "elevation_gain",
+  "calories",
+  "notes",
+  "gpx_file",
+  "route_points"
+ ],
+ "fields": [
+  {
+   "fieldname": "run_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Run Name"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "default": "Running",
+   "fieldname": "activity_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Activity Type",
+   "options": "Running\nSwimming\nCycling"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Location"
+  },
+  {
+   "fieldname": "distance_km",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Distance (km)"
+  },
+  {
+   "fieldname": "duration_sec",
+   "fieldtype": "Float",
+   "label": "Duration (sec)"
+  },
+  {
+   "fieldname": "elevation_gain",
+   "fieldtype": "Float",
+   "label": "Elevation Gain (m)"
+  },
+  {
+   "fieldname": "calories",
+   "fieldtype": "Float",
+   "label": "Calories"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "gpx_file",
+   "fieldtype": "Attach",
+   "label": "GPX File"
+  },
+  {
+   "fieldname": "route_points",
+   "fieldtype": "Long Text",
+   "label": "Route Points"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-15 20:25:49.111333",
+ "modified_by": "Administrator",
+ "module": "Running Journal",
+ "name": "Run",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
