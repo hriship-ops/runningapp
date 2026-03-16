@@ -17,7 +17,8 @@
   "calories",
   "notes",
   "gpx_file",
-  "route_points"
+  "route_points",
+  "strava_id"
  ],
  "fields": [
   {
@@ -82,12 +83,18 @@
    "fieldname": "route_points",
    "fieldtype": "Long Text",
    "label": "Route Points"
+  },
+  {
+   "fieldname": "strava_id",
+   "fieldtype": "Data",
+   "label": "Strava ID",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-15 20:25:49.111333",
+ "modified": "2026-03-16 08:56:53.461576",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "Run",

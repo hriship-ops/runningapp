@@ -13,7 +13,12 @@
   "units",
   "default_activity",
   "pace_format",
-  "calories_formula"
+  "calories_formula",
+  "strava_client_id",
+  "strava_client_secret",
+  "strava_access_token",
+  "strava_refresh_token",
+  "strava_last_sync"
  ],
  "fields": [
   {
@@ -71,12 +76,37 @@
    "fieldtype": "Select",
    "label": "Calories Formula",
    "options": "Estimated\nManual"
+  },
+  {
+   "fieldname": "strava_client_id",
+   "fieldtype": "Data",
+   "label": "Strava Client ID"
+  },
+  {
+   "fieldname": "strava_client_secret",
+   "fieldtype": "Password",
+   "label": "Strava Client Secret"
+  },
+  {
+   "fieldname": "strava_access_token",
+   "fieldtype": "Password",
+   "label": "Strava Access Token"
+  },
+  {
+   "fieldname": "strava_refresh_token",
+   "fieldtype": "Password",
+   "label": "Strava Refresh Token"
+  },
+  {
+   "fieldname": "strava_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Strava Last Sync"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-15 20:24:10.829168",
+ "modified": "2026-03-15 21:56:46.765718",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "RunSettings",
