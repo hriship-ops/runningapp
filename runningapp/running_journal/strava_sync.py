@@ -4,17 +4,23 @@ import json
 from datetime import datetime
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
+SETTINGS = "Run Settings"
+
+
+def get_settings_value(field):
+    return frappe.db.get_single_value(SETTINGS, field)
+
 
 def get_valid_access_token():
-    client_id = frappe.db.get_value("RunSettings", {"name": "RunSettings"}, "strava_client_id")
-    access_token = get_decrypted_password("RunSettings", "RunSettings", "strava_access_token")
+    client_id = get_settings_value("strava_client_id")
+    access_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_access_token")
     test = requests.get(
         "https://www.strava.com/api/v3/athlete",
         headers={"Authorization": f"Bearer {access_token}"}
     )
     if test.status_code == 401:
-        client_secret = get_decrypted_password("RunSettings", "RunSettings", "strava_client_secret")
-        refresh_token = get_decrypted_password("RunSettings", "RunSettings", "strava_refresh_token")
+        client_secret = get_decrypted_password(SETTINGS, SETTINGS, "strava_client_secret")
+        refresh_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_refresh_token")
         r = requests.post("https://www.strava.com/oauth/token", data={
             "client_id": client_id,
             "client_secret": client_secret,
@@ -22,8 +28,8 @@ def get_valid_access_token():
             "grant_type": "refresh_token"
         })
         tokens = r.json()
-        set_encrypted_password("RunSettings", "RunSettings", tokens["access_token"], "strava_access_token")
-        set_encrypted_password("RunSettings", "RunSettings", tokens["refresh_token"], "strava_refresh_token")
+        set_encrypted_password(SETTINGS, SETTINGS, tokens["access_token"], "strava_access_token")
+        set_encrypted_password(SETTINGS, SETTINGS, tokens["refresh_token"], "strava_refresh_token")
         frappe.db.commit()
         return tokens["access_token"]
     return access_token
@@ -76,9 +82,9 @@ def get_location(lat, lon):
 
 def calculate_calories(distance_km, duration_sec, activity_type):
     try:
-        weight = frappe.db.get_value("RunSettings", {"name": "RunSettings"}, "weight_kg") or 70
-        age = frappe.db.get_value("RunSettings", {"name": "RunSettings"}, "age") or 35
-        gender = frappe.db.get_value("RunSettings", {"name": "RunSettings"}, "gender") or "Male"
+        weight = get_settings_value("weight_kg") or 70
+        age = get_settings_value("age") or 35
+        gender = get_settings_value("gender") or "Male"
         age_factor = 1.0 - (max(0, age - 30) * 0.005)
         gender_factor = 1.0 if gender == "Male" else 0.9
         if activity_type == "Swimming":
@@ -93,10 +99,11 @@ def calculate_calories(distance_km, duration_sec, activity_type):
 
 def activity_to_run(activity, streams=None):
     type_map = {
-        "Run": "Running", "TrailRun": "Running", "VirtualRun": "Running",
-        "Swim": "Swimming", "Ride": "Cycling", "VirtualRide": "Cycling"
+        "Run": "Run", "TrailRun": "Run", "VirtualRun": "Run",
+        "Swim": "Swimming", "Ride": "Cycling", "VirtualRide": "Cycling",
+        "Walk": "Walk"
     }
-    activity_type = type_map.get(activity.get("type", ""), "Running")
+    activity_type = type_map.get(activity.get("type", ""), "Run")
     distance_km = round((activity.get("distance", 0) or 0) / 1000, 3)
     duration_sec = activity.get("moving_time", 0) or 0
     elevation_gain = round(activity.get("total_elevation_gain", 0) or 0)
@@ -129,13 +136,14 @@ def activity_to_run(activity, streams=None):
         "duration_sec": duration_sec,
         "elevation_gain": elevation_gain,
         "calories": calories,
-        "route_points": json.dumps(route_points) if route_points else ""
+        "route_points": json.dumps(route_points) if route_points else "",
+        "strava_id": str(activity.get("id", ""))
     }
 
 
 @frappe.whitelist()
 def sync_strava(full_sync=False):
-    last_sync = frappe.db.get_value("RunSettings", {"name": "RunSettings"}, "strava_last_sync")
+    last_sync = get_settings_value("strava_last_sync")
     after = None
     if not full_sync and last_sync:
         after = datetime.strptime(str(last_sync)[:19], "%Y-%m-%d %H:%M:%S")
@@ -148,24 +156,22 @@ def sync_strava(full_sync=False):
             break
         for activity in activities:
             strava_id = str(activity.get("id", ""))
-            existing = frappe.db.exists("Run", {"strava_id": strava_id})
-            if existing:
+            if frappe.db.exists("Run", {"strava_id": strava_id}):
                 skipped += 1
                 continue
-            if activity.get("type") not in ["Run", "TrailRun", "VirtualRun", "Swim", "Ride", "VirtualRide"]:
+            if activity.get("type") not in ["Run", "TrailRun", "VirtualRun", "Swim", "Ride", "VirtualRide", "Walk"]:
                 skipped += 1
                 continue
             streams = {}
             if activity.get("start_latlng"):
                 streams = fetch_activity_streams(activity["id"])
             run_data = activity_to_run(activity, streams)
-            run_data["strava_id"] = strava_id
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
             imported += 1
         if len(activities) < 50:
             break
         page += 1
-    frappe.db.set_value("RunSettings", "RunSettings", "strava_last_sync", datetime.now())
+    frappe.db.set_single_value(SETTINGS, "strava_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped}

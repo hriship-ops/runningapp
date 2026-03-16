@@ -1,0 +1,91 @@
+{
+ "app": "runningapp",
+ "charts": [],
+ "content": "[{\"id\": \"rj001\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Running Journal</b></span>\", \"col\": 12}}, {\"id\": \"rj002\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Run\", \"col\": 3}}, {\"id\": \"rj003\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Data Import\", \"col\": 3}}, {\"id\": \"rj004\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Run Settings\", \"col\": 3}}, {\"id\": \"rj005\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal\", \"col\": 3}}, {\"id\": \"rj006\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Run Detail\", \"col\": 3}}, {\"id\": \"rj007\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"rj008\", \"type\": \"card\", \"data\": {\"card_name\": \"Running Journal\", \"col\": 4}}]",
+ "creation": "2026-03-16 09:19:52.174654",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Running Journal",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Run",
+   "link_count": 0,
+   "link_to": "Run",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Run Settings",
+   "link_count": 0,
+   "link_to": "Run Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Data Import",
+   "link_count": 0,
+   "link_to": "Data Import",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-03-16 13:32:02.295976",
+ "modified_by": "Administrator",
+ "module": "Running Journal",
+ "name": "Running Journal",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 0.0,
+ "shortcuts": [
+  {
+   "doc_view": "",
+   "label": "Run",
+   "link_to": "Run",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "",
+   "label": "Data Import",
+   "link_to": "Data Import",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "",
+   "label": "Run Settings",
+   "type": "URL",
+   "url": "/desk/run-settings"
+  },
+  {
+   "doc_view": "",
+   "label": "Journal",
+   "type": "URL",
+   "url": "/app/run-journal"
+  },
+  {
+   "doc_view": "",
+   "label": "Run Detail",
+   "type": "URL",
+   "url": "/app/run-detail"
+  }
+ ],
+ "title": "Running Journal",
+ "type": "Workspace"
+}

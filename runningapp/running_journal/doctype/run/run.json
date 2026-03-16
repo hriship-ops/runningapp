@@ -35,12 +35,12 @@
    "reqd": 1
   },
   {
-   "default": "Running",
+   "default": "Run",
    "fieldname": "activity_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Activity Type",
-   "options": "Running\nSwimming\nCycling"
+   "options": "Run\nWalk\nSwimming\nCycling"
   },
   {
    "fieldname": "location",
@@ -94,7 +94,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-16 09:24:21.665760",
+ "modified": "2026-03-16 13:46:04.940683",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "Run",

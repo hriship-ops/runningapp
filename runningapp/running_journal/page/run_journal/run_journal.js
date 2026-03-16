@@ -180,7 +180,7 @@ function rjCloseModal() {
 }
 
 function rjOpenDetail(name) {
-    window.open('/app/run/' + name, '_blank');
+    window.open('/app/run-detail?name=' + name, '_blank');
 }
 
 function rjLoadTicker() {

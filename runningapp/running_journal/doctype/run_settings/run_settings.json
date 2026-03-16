@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-03-15 20:19:02.141705",
+ "creation": "2026-03-16 13:25:56.306111",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -22,60 +22,49 @@
  ],
  "fields": [
   {
-   "default": "70",
    "fieldname": "weight_kg",
    "fieldtype": "Float",
-   "label": "Weight (kg)",
-   "non_negative": 1
+   "label": "Weight (kg)"
   },
   {
-   "default": "35",
    "fieldname": "age",
    "fieldtype": "Int",
-   "label": "Age",
-   "non_negative": 1
+   "label": "Age"
   },
   {
-   "default": "Male",
    "fieldname": "gender",
    "fieldtype": "Select",
    "label": "Gender",
    "options": "Male\nFemale\nOther"
   },
   {
-   "default": "60",
    "fieldname": "resting_heart_rate",
    "fieldtype": "Int",
-   "label": "Resting Heart Rate",
-   "non_negative": 1
+   "label": "Resting Heart Rate"
   },
   {
-   "default": "km",
    "fieldname": "units",
    "fieldtype": "Select",
    "label": "Units",
-   "options": "km\nmiles"
+   "options": "Metric\nImperial"
   },
   {
-   "default": "Running",
    "fieldname": "default_activity",
    "fieldtype": "Select",
    "label": "Default Activity",
-   "options": "Running\nSwimming\nCycling"
+   "options": "Run\nWalk\nSwimming\nCycling"
   },
   {
-   "default": "min/km",
    "fieldname": "pace_format",
    "fieldtype": "Select",
    "label": "Pace Format",
    "options": "min/km\nmin/mile"
   },
   {
-   "default": "Estimated",
    "fieldname": "calories_formula",
    "fieldtype": "Select",
    "label": "Calories Formula",
-   "options": "Estimated\nManual"
+   "options": "MET\nSimple"
   },
   {
    "fieldname": "strava_client_id",
@@ -105,13 +94,25 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "issingle": 1,
  "links": [],
- "modified": "2026-03-15 21:56:46.765718",
+ "modified": "2026-03-16 13:30:14.879480",
  "modified_by": "Administrator",
  "module": "Running Journal",
- "name": "RunSettings",
+ "name": "Run Settings",
  "owner": "Administrator",
- "permissions": [],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
