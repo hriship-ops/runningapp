@@ -1,0 +1,72 @@
+<div class="run-journal-app">
+  <div class="rj-header">
+    <div class="rj-logo">
+      <div class="rj-logo-icon">&#9673;</div>
+      <div>
+        <div class="rj-logo-title">Run Journal</div>
+        <div class="rj-logo-sub" id="rj-total-sub">Loading...</div>
+      </div>
+    </div>
+    <button class="rj-btn-import" onclick="rjShowImport()">Import GPX</button>
+  </div>
+
+  <div class="rj-ticker-wrap">
+    <div class="rj-ticker-label">Recent</div>
+    <div class="rj-ticker-items" id="rj-ticker"></div>
+    <div class="rj-ticker-nav">
+      <button onclick="rjTickerPrev()">&#8249;</button>
+      <span id="rj-ticker-page">1/1</span>
+      <button onclick="rjTickerNext()">&#8250;</button>
+    </div>
+  </div>
+
+  <div class="rj-filters">
+    <select id="rj-year"></select>
+    <select id="rj-month">
+      <option value="">All Months</option>
+      <option value="01">January</option>
+      <option value="02">February</option>
+      <option value="03">March</option>
+      <option value="04">April</option>
+      <option value="05">May</option>
+      <option value="06">June</option>
+      <option value="07">July</option>
+      <option value="08">August</option>
+      <option value="09">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
+    <select id="rj-activity">
+      <option value="">All Activities</option>
+      <option value="Running">Running</option>
+      <option value="Swimming">Swimming</option>
+      <option value="Cycling">Cycling</option>
+    </select>
+    <button class="rj-btn-search" onclick="rjSearch()">Search</button>
+    <button class="rj-btn-reset" onclick="rjReset()">Reset</button>
+  </div>
+
+  <div class="rj-section-label" id="rj-section-label">Loading...</div>
+  <div class="rj-cards-grid" id="rj-cards"></div>
+
+  <div class="rj-modal-overlay" id="rj-modal" style="display:none">
+    <div class="rj-modal">
+      <div class="rj-modal-header">
+        <div class="rj-modal-title" id="rj-modal-title">Runs</div>
+        <button class="rj-modal-close" onclick="rjCloseModal()">&#215;</button>
+      </div>
+      <div class="rj-modal-body">
+        <table class="rj-table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Activity</th><th>Location</th>
+              <th>Distance</th><th>Time</th><th>Pace</th>
+            </tr>
+          </thead>
+          <tbody id="rj-modal-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
