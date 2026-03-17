@@ -2,7 +2,6 @@ frappe.pages['run-journal'].on_page_load = function(wrapper) {
     frappe.ui.make_app_page({ parent: wrapper, title: 'Run Journal', single_column: true });
     $(wrapper).find('.layout-main-section').html(frappe.render_template('run_journal', {}));
     
-    // Make all functions global
     window.rjSearch = rjSearch;
     window.rjReset = rjReset;
     window.rjShowModal = rjShowModal;
@@ -52,7 +51,7 @@ function fmtDate(d) {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {day:'numeric', month:'short', year:'numeric'});
 }
 function actPill(type) {
-    var cls = type === 'Swimming' ? 'rj-act-swim' : type === 'Cycling' ? 'rj-act-cycle' : 'rj-act-run';
+    var cls = type === 'Swimming' ? 'rj-act-swim' : type === 'Cycling' ? 'rj-act-cycle' : type === 'Walk' ? 'rj-act-walk' : 'rj-act-run';
     return '<span class="' + cls + '">' + type + '</span>';
 }
 
@@ -91,14 +90,8 @@ function rjGetFilters() {
 function rjLoadStats() {
     var filters = rjGetFilters();
     frappe.call({
-        method: 'frappe.client.get_list',
-        args: {
-            doctype: 'Run',
-            filters: filters,
-            fields: ['name','run_name','date','activity_type','location','distance_km','duration_sec','elevation_gain','calories'],
-            limit: 0,
-            order_by: 'date desc'
-        },
+        method: 'runningapp.running_journal.doctype.run.run.get_all_runs',
+        args: { filters: JSON.stringify(filters) },
         callback: function(r) {
             rjState.runs = r.message || [];
             rjRenderStats(rjState.runs);
@@ -180,20 +173,14 @@ function rjCloseModal() {
 }
 
 function rjOpenDetail(name) {
-    window.open('/app/run/' + name, '_blank');
+    window.open('/app/run-detail?name=' + name, '_blank');
 }
 
 function rjLoadTicker() {
     var filters = rjState.activity ? [['activity_type', '=', rjState.activity]] : [];
     frappe.call({
-        method: 'frappe.client.get_list',
-        args: {
-            doctype: 'Run',
-            filters: filters,
-            fields: ['name','run_name','date','activity_type','location','distance_km','duration_sec','calories'],
-            limit: 200,
-            order_by: 'date desc'
-        },
+        method: 'runningapp.running_journal.doctype.run.run.get_all_runs',
+        args: { filters: JSON.stringify(filters) },
         callback: function(r) {
             rjTickerRuns = r.message || [];
             rjRenderTicker();
@@ -208,7 +195,7 @@ function rjRenderTicker() {
     var items = rjTickerRuns.slice(start, start + pageSize);
     var totalPages = Math.ceil(rjTickerRuns.length / pageSize);
     var html = items.map(function(r) {
-        var emoji = r.activity_type === 'Swimming' ? '\u{1F3CA}' : r.activity_type === 'Cycling' ? '\u{1F6B4}' : '\u{1F3C3}';
+        var emoji = r.activity_type === 'Swimming' ? '\u{1F3CA}' : r.activity_type === 'Cycling' ? '\u{1F6B4}' : r.activity_type === 'Walk' ? '\u{1F6B6}' : '\u{1F3C3}';
         return '<div class="rj-ticker-item" onclick="rjOpenDetail(\'' + r.name + '\')">' +
             emoji + ' ' + fmtDate(r.date) + ' &middot; ' + (r.location || '') +
             ' &middot; ' + fmtDist(r.distance_km||0) +
@@ -230,5 +217,5 @@ function rjTickerPrev() {
 }
 
 function rjShowImport() {
-    frappe.msgprint('GPX bulk import coming soon. Use Strava sync for now.');
+    window.open('/app/run-import', '_blank');
 }
