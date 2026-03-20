@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Run Journal</title>
+  <link rel="stylesheet" href="/assets/runningapp/css/run-journal-www.css">
+</head>
+<body>
+  <div class="rw-app">
+    <div class="rw-header">
+      <div class="rw-logo">
+        <div class="rw-logo-icon">&#9673;</div>
+        <div>
+          <div class="rw-logo-title">Run Journal</div>
+          <div class="rw-logo-sub" id="rw-total-sub">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rw-ticker-wrap">
+      <div class="rw-ticker-label">Recent</div>
+      <div class="rw-ticker-items" id="rw-ticker"></div>
+      <div class="rw-ticker-nav">
+        <button onclick="rwTickerPrev()">&#8249;</button>
+        <span id="rw-ticker-page">1/1</span>
+        <button onclick="rwTickerNext()">&#8250;</button>
+      </div>
+    </div>
+
+    <div class="rw-filters">
+      <select id="rw-year"></select>
+      <select id="rw-month">
+        <option value="">All Months</option>
+        <option value="01">January</option>
+        <option value="02">February</option>
+        <option value="03">March</option>
+        <option value="04">April</option>
+        <option value="05">May</option>
+        <option value="06">June</option>
+        <option value="07">July</option>
+        <option value="08">August</option>
+        <option value="09">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+      <select id="rw-activity">
+        <option value="">All Activities</option>
+        <option value="Run">Run</option>
+        <option value="Walk">Walk</option>
+        <option value="Swimming">Swimming</option>
+        <option value="Cycling">Cycling</option>
+      </select>
+      <button class="rw-btn-search" onclick="rwSearch()">Search</button>
+      <button class="rw-btn-reset" onclick="rwReset()">Reset</button>
+    </div>
+
+    <div class="rw-section-label" id="rw-section-label">Loading...</div>
+    <div class="rw-cards-grid" id="rw-cards"></div>
+
+    <div class="rw-modal-overlay" id="rw-modal" style="display:none" onclick="rwCloseModal(event)">
+      <div class="rw-modal">
+        <div class="rw-modal-header">
+          <div class="rw-modal-title" id="rw-modal-title">Runs</div>
+          <button class="rw-modal-close" onclick="rwCloseModal()">&#215;</button>
+        </div>
+        <div class="rw-modal-body">
+          <table class="rw-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Activity</th><th>Location</th>
+                <th>Distance</th><th>Time</th><th>Pace</th>
+              </tr>
+            </thead>
+            <tbody id="rw-modal-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/runningapp/js/run-journal-www.js"></script>
+</body>
+</html>

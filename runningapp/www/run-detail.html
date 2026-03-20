@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Run Detail</title>
+  <link rel="stylesheet" href="/assets/runningapp/css/run-journal-www.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    .rd-wrap { max-width:900px; margin:0 auto; padding-bottom:3rem; font-family:system-ui,sans-serif; color:#f1f5f9; }
+    .rd-header { background:#0f172a; border-bottom:1px solid #1e293b; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .rd-title { font-size:16px; font-weight:600; color:#f1f5f9; }
+    .rd-meta { font-size:11px; color:#64748b; margin-top:2px; }
+    .rd-back { font-size:12px; background:transparent; border:1px solid #334155; border-radius:6px; padding:5px 12px; color:#94a3b8; cursor:pointer; text-decoration:none; }
+    .rd-map { width:100%; height:300px; background:#1e293b; }
+    .rd-stats { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid #1e293b; background:#0f172a; }
+    .rd-stat { padding:14px 8px; text-align:center; border-right:1px solid #1e293b; }
+    .rd-stat:last-child { border-right:none; }
+    .rd-stat-label { font-size:10px; color:#475569; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+    .rd-stat-val { font-size:20px; font-weight:600; color:#ea580c; }
+    .rd-stat-unit { font-size:11px; color:#475569; margin-top:1px; }
+    .rd-section { padding:1.25rem 1.5rem; border-bottom:1px solid #1e293b; }
+    .rd-section-label { font-size:10px; color:#475569; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+    .rd-elev { width:100%; height:80px; display:block; }
+    .rd-splits { display:flex; flex-wrap:wrap; gap:6px; }
+    .rd-split { background:#1e293b; border:1px solid #334155; border-radius:6px; padding:8px 10px; min-width:58px; text-align:center; }
+    .rd-split-km { font-size:10px; color:#475569; margin-bottom:2px; }
+    .rd-split-pace { font-size:13px; font-weight:600; color:#94a3b8; }
+    .rd-split-best .rd-split-pace { color:#ea580c; }
+    .rd-split-fast .rd-split-pace { color:#4ade80; }
+    .rd-notes { width:100%; box-sizing:border-box; background:#1e293b; border:1px solid #334155; border-radius:8px; padding:10px 14px; color:#94a3b8; font-size:13px; min-height:72px; resize:vertical; font-family:inherit; }
+  </style>
+</head>
+<body style="background:#0f172a; margin:0;">
+<div class="rd-wrap">
+  <div class="rd-header">
+    <div>
+      <div class="rd-title" id="rd-title">Loading...</div>
+      <div class="rd-meta" id="rd-meta"></div>
+    </div>
+    <a href="/run-journal" class="rd-back">← Journal</a>
+  </div>
+  <div id="rd-map" class="rd-map"></div>
+  <div class="rd-stats" id="rd-stats"></div>
+  <div class="rd-section" id="rd-elev-section" style="display:none">
+    <div class="rd-section-label">Elevation Profile</div>
+    <svg id="rd-elev" class="rd-elev" viewBox="0 0 820 80" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="rd-section" id="rd-splits-section" style="display:none">
+    <div class="rd-section-label">Km Splits</div>
+    <div class="rd-splits" id="rd-splits"></div>
+  </div>
+  <div class="rd-section">
+    <div class="rd-section-label">Notes</div>
+    <textarea id="rd-notes" class="rd-notes" readonly placeholder="No notes"></textarea>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/runningapp/js/run-detail-www.js"></script>
+</body>
+</html>
