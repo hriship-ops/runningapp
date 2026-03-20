@@ -17,7 +17,6 @@
         </div>
       </div>
     </div>
-
     <div class="rw-ticker-wrap">
       <div class="rw-ticker-label">Recent</div>
       <div class="rw-ticker-items" id="rw-ticker"></div>
@@ -27,7 +26,6 @@
         <button onclick="rwTickerNext()">&#8250;</button>
       </div>
     </div>
-
     <div class="rw-filters">
       <select id="rw-year"></select>
       <select id="rw-month">
@@ -55,9 +53,11 @@
       <button class="rw-btn-search" onclick="rwSearch()">Search</button>
       <button class="rw-btn-reset" onclick="rwReset()">Reset</button>
     </div>
-
     <div class="rw-section-label" id="rw-section-label">Loading...</div>
     <div class="rw-cards-grid" id="rw-cards"></div>
+
+    <div class="rw-section-label" style="margin-top:24px">All-time records</div>
+    <div class="rw-cards-grid" id="rw-records"></div>
 
     <div class="rw-modal-overlay" id="rw-modal" style="display:none" onclick="rwCloseModal(event)">
       <div class="rw-modal">
@@ -79,7 +79,6 @@
       </div>
     </div>
   </div>
-
   <script src="/assets/runningapp/js/run-journal-www.js"></script>
 </body>
 </html>
