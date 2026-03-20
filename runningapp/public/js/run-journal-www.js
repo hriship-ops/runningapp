@@ -74,11 +74,7 @@ function rwReset() {
 
 function rwLoadStats() {
     var filters = rwGetFilters();
-    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': 'fetch'},
-        body: JSON.stringify({filters: JSON.stringify(filters)})
-    })
+    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify(filters)))
     .then(r => r.json())
     .then(data => {
         rwState.runs = data.message || [];
@@ -88,11 +84,7 @@ function rwLoadStats() {
 }
 
 function rwLoadTicker() {
-    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': 'fetch'},
-        body: JSON.stringify({filters: JSON.stringify([])})
-    })
+    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify([])))
     .then(r => r.json())
     .then(data => {
         rwTickerRuns = data.message || [];
