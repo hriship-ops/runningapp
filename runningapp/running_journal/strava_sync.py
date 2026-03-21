@@ -116,6 +116,9 @@ def activity_to_run(activity, streams=None):
     calories = activity.get("calories", 0) or 0
     if not calories:
         calories = calculate_calories(distance_km, duration_sec, activity_type)
+    avg_heart_rate = round(activity.get("average_heartrate", 0) or 0)
+    max_heart_rate = round(activity.get("max_heartrate", 0) or 0)
+       
     route_points = []
     if streams and "latlng" in streams:
         latlng_data = streams["latlng"].get("data", [])
@@ -136,6 +139,8 @@ def activity_to_run(activity, streams=None):
         "duration_sec": duration_sec,
         "elevation_gain": elevation_gain,
         "calories": calories,
+        "avg_heart_rate": avg_heart_rate,
+        "max_heart_rate": max_heart_rate,
         "route_points": json.dumps(route_points) if route_points else "",
         "strava_id": str(activity.get("id", ""))
     }
