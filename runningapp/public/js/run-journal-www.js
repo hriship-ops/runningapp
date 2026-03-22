@@ -140,6 +140,9 @@ function rwRenderStats(runs) {
     var totalCal = runs.reduce(function(a,r) { return a + (r.calories||0); }, 0);
     var avgDist = runs.length ? totalDist / runs.length : 0;
     var longest = runs.length ? Math.max.apply(null, runs.map(function(r) { return r.distance_km||0; })) : 0;
+    var runsWithHR = runs.filter(function(r) { return r.avg_heart_rate > 0; });
+    var avgHR = runsWithHR.length ? Math.round(runsWithHR.reduce(function(a,r) { return a + r.avg_heart_rate; }, 0) / runsWithHR.length) : null;
+    var maxHR = runsWithHR.length ? Math.max.apply(null, runsWithHR.map(function(r) { return r.max_heart_rate||0; })) : null;
 
     var html = '';
     html += makeCard(runs.length, 'Total runs', 'click to view', true, 'rwShowModal()');
@@ -150,6 +153,8 @@ function rwRenderStats(runs) {
     html += makeCard(Math.round(totalElev) + ' m', 'Total elevation', '&nbsp;', false, null);
     html += makeCard(fmtDist(longest), 'Longest run', 'click to view', true, 'rwShowModal()');
     html += makeCard(Math.round(totalCal) + ' kcal', 'Total calories', '&nbsp;', false, null);
+    html += makeCard(avgHR ? avgHR + ' bpm' : '--', 'Avg heart rate', '&nbsp;', false, null);
+    html += makeCard(maxHR ? maxHR + ' bpm' : '--', 'Max heart rate', '&nbsp;', false, null);
 
     var el = document.getElementById('rw-cards');
     if (el) el.innerHTML = html;

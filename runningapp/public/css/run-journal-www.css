@@ -23,7 +23,7 @@
 
 .rw-section-label { padding:0 20px 10px; font-size:11px; color:#475569; text-transform:uppercase; letter-spacing:1px; }
 
-.rw-cards-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 20px 14px; }
+.rw-cards-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:0 20px 14px; }
 .rw-card { background:#1e293b; border:1px solid #334155; border-radius:10px; padding:14px 16px; cursor:pointer; transition:border-color 0.15s; }
 .rw-card:hover { border-color:#ea580c; }
 .rw-card.no-click { cursor:default; }

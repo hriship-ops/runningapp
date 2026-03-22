@@ -20,7 +20,19 @@
   "notes",
   "gpx_file",
   "route_points",
-  "strava_id"
+  "strava_id",
+  "avg_cadence",
+  "max_cadence",
+  "avg_temperature",
+  "perceived_exertion",
+  "training_load",
+  "avg_watts",
+  "max_watts",
+  "avg_speed",
+  "max_speed",
+  "avg_grade",
+  "elevation_loss",
+  "relative_effort"
  ],
  "fields": [
   {
@@ -101,6 +113,66 @@
    "fieldtype": "Data",
    "label": "Strava ID",
    "read_only": 1
+  },
+  {
+   "fieldname": "avg_cadence",
+   "fieldtype": "Float",
+   "label": "Avg Cadence (spm)"
+  },
+  {
+   "fieldname": "max_cadence",
+   "fieldtype": "Float",
+   "label": "Max Cadence (spm)"
+  },
+  {
+   "fieldname": "avg_temperature",
+   "fieldtype": "Float",
+   "label": "Avg Temperature (\u00b0C)"
+  },
+  {
+   "fieldname": "perceived_exertion",
+   "fieldtype": "Float",
+   "label": "Perceived Exertion"
+  },
+  {
+   "fieldname": "training_load",
+   "fieldtype": "Float",
+   "label": "Training Load"
+  },
+  {
+   "fieldname": "avg_watts",
+   "fieldtype": "Float",
+   "label": "Avg Power (W)"
+  },
+  {
+   "fieldname": "max_watts",
+   "fieldtype": "Float",
+   "label": "Max Power (W)"
+  },
+  {
+   "fieldname": "avg_speed",
+   "fieldtype": "Float",
+   "label": "Avg Speed (m/s)"
+  },
+  {
+   "fieldname": "max_speed",
+   "fieldtype": "Float",
+   "label": "Max Speed (m/s)"
+  },
+  {
+   "fieldname": "avg_grade",
+   "fieldtype": "Float",
+   "label": "Avg Grade (%)"
+  },
+  {
+   "fieldname": "elevation_loss",
+   "fieldtype": "Float",
+   "label": "Elevation Loss (m)"
+  },
+  {
+   "fieldname": "relative_effort",
+   "fieldtype": "Float",
+   "label": "Relative Effort"
   }
  ],
  "grid_page_length": 50,
