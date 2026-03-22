@@ -139,7 +139,8 @@ function rwRenderStats(runs) {
     var totalElev = runs.reduce(function(a,r) { return a + (r.elevation_gain||0); }, 0);
     var totalCal = runs.reduce(function(a,r) { return a + (r.calories||0); }, 0);
     var avgDist = runs.length ? totalDist / runs.length : 0;
-    var longest = runs.length ? Math.max.apply(null, runs.map(function(r) { return r.distance_km||0; })) : 0;
+    var longestRun = runs.length ? runs.reduce(function(a,r) { return (r.distance_km||0) > (a.distance_km||0) ? r : a; }, runs[0]) : null;
+    var longest = longestRun ? longestRun.distance_km : 0;
     var runsWithHR = runs.filter(function(r) { return r.avg_heart_rate > 0; });
     var avgHR = runsWithHR.length ? Math.round(runsWithHR.reduce(function(a,r) { return a + r.avg_heart_rate; }, 0) / runsWithHR.length) : null;
     var maxHR = runsWithHR.length ? Math.max.apply(null, runsWithHR.map(function(r) { return r.max_heart_rate||0; })) : null;
@@ -151,7 +152,7 @@ function rwRenderStats(runs) {
     html += makeCard(fmtPace(totalDist, totalSec), 'Avg pace', '&nbsp;', false, null);
     html += makeCard(fmtDist(avgDist), 'Avg distance', 'click to view', true, 'rwShowModal()');
     html += makeCard(Math.round(totalElev) + ' m', 'Total elevation', '&nbsp;', false, null);
-    html += makeCard(fmtDist(longest), 'Longest run', 'click to view', true, 'rwShowModal()');
+    html += makeCard(fmtDist(longest), 'Longest run', longestRun ? fmtDate(longestRun.date) : '&nbsp;', true, longestRun ? 'rwOpenDetail(\'' + longestRun.name + '\')' : '');
     html += makeCard(Math.round(totalCal) + ' kcal', 'Total calories', '&nbsp;', false, null);
     html += makeCard(avgHR ? avgHR + ' bpm' : '--', 'Avg heart rate', '&nbsp;', false, null);
     html += makeCard(maxHR ? maxHR + ' bpm' : '--', 'Max heart rate', '&nbsp;', false, null);
@@ -238,8 +239,8 @@ function rwRenderRecords(runs) {
     }
 
     var html = '';
-    html += makeCard(bMonth ? fmtMonthKey(bMonth.key) : '--', 'Best month', bMonth ? fmtDist(bMonth.dist) + ' · ' + bMonth.count + ' runs' : '&nbsp;', false, null);
-    html += makeCard(wMonth ? fmtMonthKey(wMonth.key) : '--', 'Worst month', wMonth ? fmtDist(wMonth.dist) + ' · ' + wMonth.count + ' runs' : '&nbsp;', false, null);
+    html += makeCard(bMonth ? fmtMonthKey(bMonth.key) : '--', 'Best month', bMonth ? fmtDist(bMonth.dist) + ' · ' + bMonth.count + ' runs' : '&nbsp;', true, bMonth ? 'rwShowMonthModal(\'' + bMonth.key + '\')' : '');
+    html += makeCard(wMonth ? fmtMonthKey(wMonth.key) : '--', 'Worst month', wMonth ? fmtDist(wMonth.dist) + ' · ' + wMonth.count + ' runs' : '&nbsp;', true, wMonth ? 'rwShowMonthModal(\'' + wMonth.key + '\')' : '');
     html += makeCard(bYear ? bYear.key : '--', 'Best year', bYear ? fmtDist(bYear.dist) + ' · ' + bYear.count + ' runs' : '&nbsp;', false, null);
     html += raceCard('Fastest 5k', f5k);
     html += raceCard('Fastest 10k', f10k);
@@ -248,6 +249,23 @@ function rwRenderRecords(runs) {
 
     var el = document.getElementById('rw-records');
     if (el) el.innerHTML = html;
+}
+
+function rwShowMonthModal(monthKey) {
+    var runs = rwAllRuns.filter(function(r) { return r.date.slice(0, 7) === monthKey; });
+    var rows = runs.map(function(r) {
+        return '<tr onclick="rwOpenDetail(\'' + r.name + '\')">' +
+            '<td>' + fmtDate(r.date) + '</td>' +
+            '<td>' + actPill(r.activity_type) + '</td>' +
+            '<td>' + (r.location || '--') + '</td>' +
+            '<td>' + fmtDist(r.distance_km||0) + '</td>' +
+            '<td>' + fmtDur(r.duration_sec||0) + '</td>' +
+            '<td>' + fmtPace(r.distance_km, r.duration_sec) + '</td>' +
+            '</tr>';
+    }).join('');
+    document.getElementById('rw-modal-rows').innerHTML = rows;
+    document.getElementById('rw-modal-title').textContent = fmtMonthKey(monthKey) + ' · ' + runs.length + ' runs';
+    document.getElementById('rw-modal').style.display = 'flex';
 }
 
 function rwShowModal() {
@@ -300,4 +318,34 @@ function rwTickerNext() {
 }
 function rwTickerPrev() {
     if (rwState.tickerPage > 0) { rwState.tickerPage--; rwRenderTicker(); }
+}
+function rwSyncStrava() {
+    var btn = document.getElementById('rw-sync-btn');
+    btn.textContent = '⟳ Syncing...';
+    btn.disabled = true;
+    fetch('/api/method/frappe.auth.get_logged_user')
+    .then(function(r) { return r.json(); })
+    .then(function(auth) {
+        if (!auth.message || auth.message === 'Guest') {
+            btn.textContent = '✗ Login required';
+            btn.disabled = false;
+            setTimeout(function() { btn.textContent = '⟳ Sync Strava'; }, 3000);
+            return;
+        }
+        fetch('/api/method/runningapp.running_journal.strava_sync.sync_strava_public')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var msg = data.message;
+            btn.textContent = '✓ ' + (msg ? msg.imported + ' new, ' + msg.skipped + ' skipped' : 'done');
+            btn.disabled = false;
+            setTimeout(function() { btn.textContent = '⟳ Sync Strava'; }, 4000);
+            rwLoadAllRuns();
+            rwSearch();
+        })
+        .catch(function() {
+            btn.textContent = '✗ Failed';
+            btn.disabled = false;
+            setTimeout(function() { btn.textContent = '⟳ Sync Strava'; }, 3000);
+        });
+    });
 }

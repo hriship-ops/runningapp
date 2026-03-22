@@ -180,3 +180,10 @@ def sync_strava(full_sync=False):
     frappe.db.set_single_value(SETTINGS, "strava_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped}
+
+@frappe.whitelist(allow_guest=True)
+def sync_strava_public():
+    user = frappe.session.user
+    if user == 'Guest':
+        frappe.throw('Login required', frappe.AuthenticationError)
+    return sync_strava(full_sync=False)
