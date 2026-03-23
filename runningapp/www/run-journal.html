@@ -8,6 +8,8 @@
 </head>
 <body>
   <div class="rw-app">
+
+    <!-- HEADER -->
     <div class="rw-header">
       <div class="rw-logo">
         <div class="rw-logo-icon">&#9673;</div>
@@ -16,8 +18,10 @@
           <div class="rw-logo-sub" id="rw-total-sub">Loading...</div>
         </div>
       </div>
-      <button class="rw-btn-sync" id="rw-sync-btn" onclick="rwSyncStrava()">⟳ Sync Strava</button>
+      <button class="rw-btn-import" id="rw-sync-btn" onclick="rwSyncStrava()">&#8635; Sync Strava</button>
     </div>
+
+    <!-- TICKER -->
     <div class="rw-ticker-wrap">
       <div class="rw-ticker-label">Recent</div>
       <div class="rw-ticker-items" id="rw-ticker"></div>
@@ -27,6 +31,8 @@
         <button onclick="rwTickerNext()">&#8250;</button>
       </div>
     </div>
+
+    <!-- FILTERS -->
     <div class="rw-filters">
       <select id="rw-year"></select>
       <select id="rw-month">
@@ -44,22 +50,53 @@
         <option value="11">November</option>
         <option value="12">December</option>
       </select>
-      <select id="rw-activity">
-        <option value="">All Activities</option>
-        <option value="Run">Run</option>
-        <option value="Walk">Walk</option>
-        <option value="Swimming">Swimming</option>
-        <option value="Cycling">Cycling</option>
-      </select>
       <button class="rw-btn-search" onclick="rwSearch()">Search</button>
       <button class="rw-btn-reset" onclick="rwReset()">Reset</button>
     </div>
+
+    <!-- FOCUS FILTER -->
+    <div class="rw-focus-bar">
+      <span class="rw-focus-label">Focus on</span>
+      <button class="rw-focus-btn active" onclick="rwSetFocus('Run')">Runs</button>
+      <button class="rw-focus-btn" onclick="rwSetFocus('Swimming')">Swims</button>
+      <button class="rw-focus-btn" onclick="rwSetFocus('Cycling')">Cycling</button>
+      <button class="rw-focus-btn" onclick="rwSetFocus('Walk')">Walks</button>
+      <button class="rw-focus-btn" onclick="rwSetFocus('')">All</button>
+    </div>
+
+    <!-- STAT CARDS -->
     <div class="rw-section-label" id="rw-section-label">Loading...</div>
     <div class="rw-cards-grid" id="rw-cards"></div>
 
+    <!-- ALL-TIME RECORDS -->
     <div class="rw-section-label" style="margin-top:24px">All-time records</div>
-    <div class="rw-cards-grid" id="rw-records"></div>
+    <div class="rw-cards-grid rw-records-grid" id="rw-records"></div>
 
+    <!-- RECENT RUNS -->
+    <div class="rw-recent-section">
+      <div class="rw-recent-title">Recent Runs</div>
+      <div id="rw-recent-runs">Loading...</div>
+    </div>
+
+    <!-- WEEKLY SUMMARY -->
+    <div class="rw-table-section">
+      <div class="rw-table-title">Last 8 Weeks</div>
+      <div id="rw-weekly-table">Loading...</div>
+    </div>
+
+    <!-- MONTHLY SUMMARY -->
+    <div class="rw-table-section">
+      <div class="rw-table-title">Last 12 Months</div>
+      <div id="rw-monthly-table">Loading...</div>
+    </div>
+
+    <!-- YEARLY SUMMARY -->
+    <div class="rw-table-section">
+      <div class="rw-table-title">By Year</div>
+      <div id="rw-yearly-table">Loading...</div>
+    </div>
+
+    <!-- MODAL -->
     <div class="rw-modal-overlay" id="rw-modal" style="display:none" onclick="rwCloseModal(event)">
       <div class="rw-modal">
         <div class="rw-modal-header">
@@ -79,6 +116,7 @@
         </div>
       </div>
     </div>
+
   </div>
   <script src="/assets/runningapp/js/run-journal-www.js"></script>
 </body>
