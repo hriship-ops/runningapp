@@ -54,7 +54,7 @@ function rdStat(label, val, unit, accent) {
 
 function rdInitMap(pts) {
     var map = L.map('rd-map', {zoomControl:true, scrollWheelZoom:false});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution:'© CartoDB', maxZoom:18
     }).addTo(map);
     var latlngs = pts.map(function(p) { return [p.lat, p.lon || p.lng]; });
@@ -80,19 +80,31 @@ function rdDrawElevation(pts) {
     document.getElementById('rd-elev-section').style.display = '';
 }
 
+
 function rdCalcSplits(pts, totalSec, totalKm) {
     if (!pts.length || !totalSec || !totalKm) return [];
-    var totalDist = totalKm * 1000;
+    var hasTime = pts[0].t != null;
     var splits = [], cumDist = 0, tStart = 0;
     for (var i = 1; i < pts.length; i++) {
         cumDist += rdHaversine(pts[i-1], pts[i]);
-        while (cumDist >= (splits.length+1)*1000 && splits.length < Math.floor(totalKm)) {
-            var tEnd = (cumDist / totalDist) * totalSec;
-            splits.push({km: splits.length+1, sec: tEnd - tStart});
+        while (cumDist >= (splits.length + 1) * 1000 && splits.length < Math.floor(totalKm)) {
+            var tEnd;
+            if (hasTime) {
+                // interpolate exact time at km boundary
+                var prevDist = cumDist - rdHaversine(pts[i-1], pts[i]);
+                var kmBoundary = (splits.length + 1) * 1000;
+                var segDist = cumDist - prevDist;
+                var frac = segDist > 0 ? (kmBoundary - prevDist) / segDist : 1;
+                tEnd = pts[i-1].t + frac * (pts[i].t - pts[i-1].t);
+            } else {
+                tEnd = (cumDist / (totalKm * 1000)) * totalSec;
+            }
+            splits.push({ km: splits.length + 1, sec: tEnd - tStart });
             tStart = tEnd;
         }
     }
     return splits;
+
 }
 
 function rdRenderSplits(splits) {

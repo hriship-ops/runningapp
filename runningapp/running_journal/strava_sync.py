@@ -118,17 +118,23 @@ def activity_to_run(activity, streams=None):
         calories = calculate_calories(distance_km, duration_sec, activity_type)
     avg_heart_rate = round(activity.get("average_heartrate", 0) or 0)
     max_heart_rate = round(activity.get("max_heartrate", 0) or 0)
-       
+
+
     route_points = []
     if streams and "latlng" in streams:
         latlng_data = streams["latlng"].get("data", [])
         alt_data = streams.get("altitude", {}).get("data", [])
+        time_data = streams.get("time", {}).get("data", [])
         step = max(1, len(latlng_data) // 500)
         for i in range(0, len(latlng_data), step):
             pt = {"lat": latlng_data[i][0], "lon": latlng_data[i][1]}
             if i < len(alt_data):
                 pt["ele"] = alt_data[i]
+            if i < len(time_data):
+                pt["t"] = time_data[i]
             route_points.append(pt)
+
+
     return {
         "doctype": "Run",
         "run_name": run_name,
@@ -148,15 +154,11 @@ def activity_to_run(activity, streams=None):
 
 @frappe.whitelist()
 def sync_strava(full_sync=False):
-    last_sync = get_settings_value("strava_last_sync")
-    after = None
-    if not full_sync and last_sync:
-        after = datetime.strptime(str(last_sync)[:19], "%Y-%m-%d %H:%M:%S")
     imported = 0
     skipped = 0
     page = 1
     while True:
-        activities = fetch_activities(per_page=50, page=page, after=after)
+        activities = fetch_activities(per_page=50, page=page, after=None)
         if not activities or not isinstance(activities, list):
             break
         for activity in activities:
@@ -180,6 +182,7 @@ def sync_strava(full_sync=False):
     frappe.db.set_single_value(SETTINGS, "strava_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped}
+
 
 @frappe.whitelist(allow_guest=True)
 def sync_strava_public():
