@@ -31,13 +31,16 @@ function rdRender(run) {
     var pace = rdFmtPace(run.distance_km, run.duration_sec);
     var elev = Math.round(run.elevation_gain || 0);
     var cal = Math.round(run.calories || 0);
+    var avgHR = run.avg_heart_rate ? Math.round(run.avg_heart_rate) : '--';
+    var maxHR = run.max_heart_rate ? Math.round(run.max_heart_rate) : '--';
 
     document.getElementById('rd-stats').innerHTML =
         rdStat('Distance', dist, 'km') +
         rdStat('Time', dur, 'h:m:s') +
         rdStat('Avg Pace', pace, '/km', true) +
         rdStat('Elevation', elev, 'm gain') +
-        rdStat('Calories', cal, 'kcal');
+        rdStat('Calories', cal, 'kcal') +
+        rdStat('Avg / Max HR', avgHR + ' / ' + maxHR, 'bpm');
 
     if (pts.length > 0) rdInitMap(pts);
     if (hasAlt) rdDrawElevation(pts);
@@ -80,40 +83,49 @@ function rdDrawElevation(pts) {
     document.getElementById('rd-elev-section').style.display = '';
 }
 
-
 function rdCalcSplits(pts, totalSec, totalKm) {
     if (!pts.length || !totalSec || !totalKm) return [];
     var hasTime = pts[0].t != null;
+    var hasHR = pts[0].hr != null;
     var splits = [], cumDist = 0, tStart = 0;
+    var hrBuf = [];
+
     for (var i = 1; i < pts.length; i++) {
-        cumDist += rdHaversine(pts[i-1], pts[i]);
+        var segDist = rdHaversine(pts[i-1], pts[i]);
+        cumDist += segDist;
+        if (hasHR && pts[i].hr) hrBuf.push(pts[i].hr);
+
         while (cumDist >= (splits.length + 1) * 1000 && splits.length < Math.floor(totalKm)) {
             var tEnd;
             if (hasTime) {
-                // interpolate exact time at km boundary
-                var prevDist = cumDist - rdHaversine(pts[i-1], pts[i]);
+                var prevCum = cumDist - segDist;
                 var kmBoundary = (splits.length + 1) * 1000;
-                var segDist = cumDist - prevDist;
-                var frac = segDist > 0 ? (kmBoundary - prevDist) / segDist : 1;
+                var frac = segDist > 0 ? (kmBoundary - prevCum) / segDist : 1;
                 tEnd = pts[i-1].t + frac * (pts[i].t - pts[i-1].t);
             } else {
                 tEnd = (cumDist / (totalKm * 1000)) * totalSec;
             }
-            splits.push({ km: splits.length + 1, sec: tEnd - tStart });
+            var avgHR = hrBuf.length ? Math.round(hrBuf.reduce(function(a,b){return a+b;},0) / hrBuf.length) : null;
+            splits.push({ km: splits.length + 1, sec: tEnd - tStart, hr: avgHR });
             tStart = tEnd;
+            hrBuf = [];
         }
     }
     return splits;
-
 }
 
 function rdRenderSplits(splits) {
     var secs = splits.map(function(s) { return s.sec; });
     var best = Math.min.apply(null, secs);
     var avg = secs.reduce(function(a,b) { return a+b; }, 0) / secs.length;
+    var hasHR = splits.some(function(s) { return s.hr != null; });
     var html = splits.map(function(s) {
         var cls = s.sec === best ? 'rd-split rd-split-best' : s.sec < avg ? 'rd-split rd-split-fast' : 'rd-split';
-        return '<div class="' + cls + '"><div class="rd-split-km">km ' + s.km + '</div><div class="rd-split-pace">' + rdFmtPaceSec(s.sec) + '</div></div>';
+        return '<div class="' + cls + '">' +
+            '<div class="rd-split-km">km ' + s.km + '</div>' +
+            '<div class="rd-split-pace">' + rdFmtPaceSec(s.sec) + '</div>' +
+            (hasHR && s.hr ? '<div class="rd-split-hr">' + s.hr + '</div>' : '') +
+            '</div>';
     }).join('');
     document.getElementById('rd-splits').innerHTML = html;
     document.getElementById('rd-splits-section').style.display = '';
@@ -131,7 +143,7 @@ function rdParsePoints(raw) {
 function rdHaversine(a, b) {
     var R = 6371000, toR = function(x) { return x * Math.PI / 180; };
     var dLat = toR(b.lat-a.lat), dLon = toR((b.lon||b.lng)-(a.lon||a.lng));
-    var x = Math.sin(dLat/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)**2;
+    var x = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)*Math.sin(dLon/2);
     return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
 }
 
