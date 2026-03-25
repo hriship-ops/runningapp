@@ -53,7 +53,7 @@ def fetch_activity_streams(activity_id):
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
-        params={"keys": "latlng,altitude,time", "key_by_type": "true"}
+        params={"keys": "latlng,altitude,time,heartrate", "key_by_type": "true"}
     )
     return r.json()
 
@@ -119,12 +119,12 @@ def activity_to_run(activity, streams=None):
     avg_heart_rate = round(activity.get("average_heartrate", 0) or 0)
     max_heart_rate = round(activity.get("max_heartrate", 0) or 0)
 
-
     route_points = []
     if streams and "latlng" in streams:
         latlng_data = streams["latlng"].get("data", [])
         alt_data = streams.get("altitude", {}).get("data", [])
         time_data = streams.get("time", {}).get("data", [])
+        hr_data = streams.get("heartrate", {}).get("data", [])
         step = max(1, len(latlng_data) // 500)
         for i in range(0, len(latlng_data), step):
             pt = {"lat": latlng_data[i][0], "lon": latlng_data[i][1]}
@@ -132,8 +132,9 @@ def activity_to_run(activity, streams=None):
                 pt["ele"] = alt_data[i]
             if i < len(time_data):
                 pt["t"] = time_data[i]
+            if i < len(hr_data):
+                pt["hr"] = hr_data[i]
             route_points.append(pt)
-
 
     return {
         "doctype": "Run",
