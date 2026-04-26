@@ -18,7 +18,11 @@
           <div class="rw-logo-sub" id="rw-total-sub">Loading...</div>
         </div>
       </div>
-      <button class="rw-btn-import" id="rw-sync-btn" onclick="rwSyncStrava()">&#8635; Sync Strava</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="rw-btn-import" id="rw-sync-btn" onclick="rwSyncStrava()" style="display:none">&#8635; Sync Strava</button>
+        <button class="rw-btn-import" id="rw-login-btn" onclick="rwShowLogin()" style="background:#374151">&#128274; Login</button>
+        <button class="rw-btn-import" id="rw-logout-btn" onclick="rwLogout()" style="display:none;background:#374151">&#128275; Logout</button>
+      </div>
     </div>
 
     <!-- TICKER -->
@@ -96,7 +100,7 @@
       <div id="rw-yearly-table">Loading...</div>
     </div>
 
-    <!-- MODAL -->
+    <!-- RUN LIST MODAL -->
     <div class="rw-modal-overlay" id="rw-modal" style="display:none" onclick="rwCloseModal(event)">
       <div class="rw-modal">
         <div class="rw-modal-header">
@@ -117,7 +121,90 @@
       </div>
     </div>
 
+    <!-- LOGIN MODAL -->
+    <div class="rw-modal-overlay" id="rw-login-modal" style="display:none" onclick="rwCloseLoginModal(event)">
+      <div class="rw-modal" style="max-width:360px">
+        <div class="rw-modal-header">
+          <div class="rw-modal-title">Login</div>
+          <button class="rw-modal-close" onclick="rwCloseLoginModal()">&#215;</button>
+        </div>
+        <div class="rw-modal-body" style="padding:24px">
+          <div style="margin-bottom:16px">
+            <label style="display:block;color:#9ca3af;font-size:12px;margin-bottom:6px">Username</label>
+                          <input id="rw-login-user" type="text" value="hrishi.p@azimpremjifoundation.org"
+              style="width:100%;box-sizing:border-box;background:#111827;border:1px solid #374151;color:#f1f5f9;padding:8px 12px;border-radius:6px;font-size:14px">
+          </div>
+          <div style="margin-bottom:24px">
+            <label style="display:block;color:#9ca3af;font-size:12px;margin-bottom:6px">Password</label>
+            <input id="rw-login-pass" type="password"
+              style="width:100%;box-sizing:border-box;background:#111827;border:1px solid #374151;color:#f1f5f9;padding:8px 12px;border-radius:6px;font-size:14px"
+              onkeydown="if(event.key==='Enter') rwDoLogin()">
+          </div>
+          <div id="rw-login-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none"></div>
+          <button onclick="rwDoLogin()"
+            style="width:100%;background:#3b82f6;color:#fff;border:none;padding:10px;border-radius:6px;font-size:14px;cursor:pointer">
+            Login
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
+
+  <script>
+    // Check login state on page load
+    fetch('/api/method/frappe.auth.get_logged_user')
+      .then(r => r.json())
+      .then(data => {
+        var user = data.message;
+        if (user && user !== 'Guest') {
+          document.getElementById('rw-sync-btn').style.display = '';
+          document.getElementById('rw-login-btn').style.display = 'none';
+          document.getElementById('rw-logout-btn').style.display = '';
+        }
+      });
+
+    function rwShowLogin() {
+      document.getElementById('rw-login-modal').style.display = 'flex';
+      setTimeout(function() { document.getElementById('rw-login-pass').focus(); }, 100);
+    }
+
+    function rwCloseLoginModal(e) {
+      if (!e || e.target === document.getElementById('rw-login-modal'))
+        document.getElementById('rw-login-modal').style.display = 'none';
+    }
+
+    function rwDoLogin() {
+      var usr = document.getElementById('rw-login-user').value;
+      var pwd = document.getElementById('rw-login-pass').value;
+      var err = document.getElementById('rw-login-error');
+      err.style.display = 'none';
+      fetch('/api/method/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'usr=' + encodeURIComponent(usr) + '&pwd=' + encodeURIComponent(pwd)
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.message === 'Logged In') {
+          location.reload();
+        } else {
+          err.textContent = 'Invalid username or password';
+          err.style.display = 'block';
+        }
+      })
+      .catch(function() {
+        err.textContent = 'Login failed — please try again';
+        err.style.display = 'block';
+      });
+    }
+
+    function rwLogout() {
+      fetch('/api/method/logout', {method: 'POST'})
+        .then(function() { location.reload(); });
+    }
+  </script>
+
   <script src="/assets/runningapp/js/run-journal-www.js"></script>
 </body>
 </html>
