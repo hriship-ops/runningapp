@@ -48,6 +48,17 @@ def fetch_activities(per_page=50, page=1, after=None):
     return r.json()
 
 
+def fetch_activity_detail(activity_id):
+    token = get_valid_access_token()
+    r = requests.get(
+        f"https://www.strava.com/api/v3/activities/{activity_id}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    if r.status_code == 200:
+        return r.json()
+    return {}
+
+
 def fetch_activity_streams(activity_id):
     token = get_valid_access_token()
     r = requests.get(
@@ -113,9 +124,15 @@ def activity_to_run(activity, streams=None):
     start_latlng = activity.get("start_latlng", [])
     if start_latlng and len(start_latlng) == 2:
         location = get_location(start_latlng[0], start_latlng[1])
-    calories = activity.get("calories", 0) or 0
+
+    # Fetch detail endpoint to get real calories (list endpoint never returns calories)
+    calories = 0
+    detail = fetch_activity_detail(activity["id"])
+    if detail:
+        calories = detail.get("calories", 0) or 0
     if not calories:
         calories = calculate_calories(distance_km, duration_sec, activity_type)
+
     avg_heart_rate = round(activity.get("average_heartrate", 0) or 0)
     max_heart_rate = round(activity.get("max_heartrate", 0) or 0)
 
