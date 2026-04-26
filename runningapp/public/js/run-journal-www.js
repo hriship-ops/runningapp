@@ -290,9 +290,9 @@ function rwBestPaceRun(runs, minKm) {
     runs.forEach(function(r) {
         if (!r.distance_km || !r.duration_sec) return;
         if (r.distance_km < minKm) return;
-        if (r.duration_sec < 600) return; // ignore runs under 10 mins
+        if (r.duration_sec < 600) return;
         var pace = r.duration_sec / r.distance_km;
-        if (pace < 150) return; // ignore pace faster than 2:30/km (GPS glitch)
+        if (pace < 150) return;
         if (pace < bestPace) { bestPace = pace; best = r; }
     });
     return best;
@@ -385,7 +385,9 @@ function rwRenderWeeklyTable(runs) {
     for (var w = 0; w < 8; w++) {
         var mon = new Date(now);
         mon.setDate(now.getDate() - ((now.getDay()+6)%7) - w*7);
+        mon.setHours(0,0,0,0);
         var sun = new Date(mon); sun.setDate(mon.getDate()+6);
+        sun.setHours(23,59,59,999);
         weeks.push({ start:mon, end:sun, runs:[], dist:0, sec:0, elev:0, hrSum:0, hrCount:0 });
     }
     runs.forEach(function(r) {

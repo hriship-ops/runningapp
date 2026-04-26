@@ -87,10 +87,7 @@ function rdCalcSplits(pts, totalSec, totalKm) {
     if (!pts.length || !totalSec || !totalKm) return [];
     var hasTime = pts[0].t != null;
     var hasHR = pts[0].hr != null;
-    var MIN_MOVING_SPEED = 0.5; // m/s — below this = stopped
-    var numSplits = Math.floor(totalKm);
-
-    // Build per-point cumulative distance and active time arrays
+    var MIN_MOVING_SPEED = 0.5;
     var cumDist = [0], cumActive = [0];
     for (var i = 1; i < pts.length; i++) {
         var segDist = rdHaversine(pts[i-1], pts[i]);
@@ -100,36 +97,21 @@ function rdCalcSplits(pts, totalSec, totalKm) {
         cumDist.push(cumDist[i-1] + segDist);
         cumActive.push(cumActive[i-1] + activedt);
     }
-
-
     var totalDist = cumDist[cumDist.length - 1];
-
-    // For each km boundary, interpolate time at that distance
-    var splits = [];
-    var prevSec = 0;
-    var hrBuf = [], ptIdx = 0;
-
+    var numSplits = Math.min(Math.floor(totalKm), Math.floor(totalDist / 1000));
+    if (numSplits < 1) return [];
+    var splits = [], prevSec = 0, hrBuf = [], ptIdx = 0;
     for (var km = 1; km <= numSplits; km++) {
         var boundary = km * 1000;
         var j = ptIdx;
         while (j < cumDist.length - 1 && cumDist[j+1] < boundary) j++;
         if (j >= cumDist.length - 1) break;
-
         var frac = (cumDist[j+1] - cumDist[j]) > 0
-            ? (boundary - cumDist[j]) / (cumDist[j+1] - cumDist[j])
-            : 1;
+            ? (boundary - cumDist[j]) / (cumDist[j+1] - cumDist[j]) : 1;
         frac = Math.max(0, Math.min(1, frac));
-
-        var secAtBoundary;
-        if (hasTime) {
-            // interpolate active time from cumActive array
-            secAtBoundary = cumActive[j] + frac * (cumActive[j+1] - cumActive[j]);
-        } else {
-            // no timestamps — proportional to distance
-            secAtBoundary = (boundary / totalDist) * totalSec;
-        }
-
-        // collect HR for points in this split
+        var secAtBoundary = hasTime
+            ? cumActive[j] + frac * (cumActive[j+1] - cumActive[j])
+            : (boundary / totalDist) * totalSec;
         while (ptIdx <= j) {
             if (hasHR && pts[ptIdx].hr) hrBuf.push(pts[ptIdx].hr);
             ptIdx++;
