@@ -87,7 +87,7 @@ function rdCalcSplits(pts, totalSec, totalKm) {
     if (!pts.length || !totalSec || !totalKm) return [];
     var hasTime = pts[0].t != null;
     var hasHR = pts[0].hr != null;
-    var PAUSE_THRESHOLD = 15;
+    var MIN_MOVING_SPEED = 0.5; // m/s — below this = stopped
     var numSplits = Math.floor(totalKm);
 
     // Build per-point cumulative distance and active time arrays
@@ -95,7 +95,8 @@ function rdCalcSplits(pts, totalSec, totalKm) {
     for (var i = 1; i < pts.length; i++) {
         var segDist = rdHaversine(pts[i-1], pts[i]);
         var dt = hasTime ? (pts[i].t - pts[i-1].t) : 0;
-        var activedt = (dt > 0 && dt <= PAUSE_THRESHOLD) ? dt : 0;
+        var speed = (dt > 0) ? segDist / dt : 0;
+        var activedt = (dt > 0 && speed >= MIN_MOVING_SPEED) ? dt : 0;
         cumDist.push(cumDist[i-1] + segDist);
         cumActive.push(cumActive[i-1] + activedt);
     }
