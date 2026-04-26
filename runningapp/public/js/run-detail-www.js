@@ -87,29 +87,56 @@ function rdCalcSplits(pts, totalSec, totalKm) {
     if (!pts.length || !totalSec || !totalKm) return [];
     var hasTime = pts[0].t != null;
     var hasHR = pts[0].hr != null;
-    var splits = [], cumDist = 0, tStart = 0;
-    var hrBuf = [];
+    var PAUSE_THRESHOLD = 15;
+    var numSplits = Math.floor(totalKm);
 
+    // Build per-point cumulative distance and active time arrays
+    var cumDist = [0], cumActive = [0];
     for (var i = 1; i < pts.length; i++) {
         var segDist = rdHaversine(pts[i-1], pts[i]);
-        cumDist += segDist;
-        if (hasHR && pts[i].hr) hrBuf.push(pts[i].hr);
+        var dt = hasTime ? (pts[i].t - pts[i-1].t) : 0;
+        var activedt = (dt > 0 && dt <= PAUSE_THRESHOLD) ? dt : 0;
+        cumDist.push(cumDist[i-1] + segDist);
+        cumActive.push(cumActive[i-1] + activedt);
+    }
 
-        while (cumDist >= (splits.length + 1) * 1000 && splits.length < Math.floor(totalKm)) {
-            var tEnd;
-            if (hasTime) {
-                var prevCum = cumDist - segDist;
-                var kmBoundary = (splits.length + 1) * 1000;
-                var frac = segDist > 0 ? (kmBoundary - prevCum) / segDist : 1;
-                tEnd = pts[i-1].t + frac * (pts[i].t - pts[i-1].t);
-            } else {
-                tEnd = (cumDist / (totalKm * 1000)) * totalSec;
-            }
-            var avgHR = hrBuf.length ? Math.round(hrBuf.reduce(function(a,b){return a+b;},0) / hrBuf.length) : null;
-            splits.push({ km: splits.length + 1, sec: tEnd - tStart, hr: avgHR });
-            tStart = tEnd;
-            hrBuf = [];
+
+    var totalDist = cumDist[cumDist.length - 1];
+
+    // For each km boundary, interpolate time at that distance
+    var splits = [];
+    var prevSec = 0;
+    var hrBuf = [], ptIdx = 0;
+
+    for (var km = 1; km <= numSplits; km++) {
+        var boundary = km * 1000;
+        var j = ptIdx;
+        while (j < cumDist.length - 1 && cumDist[j+1] < boundary) j++;
+        if (j >= cumDist.length - 1) break;
+
+        var frac = (cumDist[j+1] - cumDist[j]) > 0
+            ? (boundary - cumDist[j]) / (cumDist[j+1] - cumDist[j])
+            : 1;
+        frac = Math.max(0, Math.min(1, frac));
+
+        var secAtBoundary;
+        if (hasTime) {
+            // interpolate active time from cumActive array
+            secAtBoundary = cumActive[j] + frac * (cumActive[j+1] - cumActive[j]);
+        } else {
+            // no timestamps — proportional to distance
+            secAtBoundary = (boundary / totalDist) * totalSec;
         }
+
+        // collect HR for points in this split
+        while (ptIdx <= j) {
+            if (hasHR && pts[ptIdx].hr) hrBuf.push(pts[ptIdx].hr);
+            ptIdx++;
+        }
+        var avgHR = hrBuf.length ? Math.round(hrBuf.reduce(function(a,b){return a+b;},0) / hrBuf.length) : null;
+        splits.push({ km: km, sec: secAtBoundary - prevSec, hr: avgHR });
+        prevSec = secAtBoundary;
+        hrBuf = [];
     }
     return splits;
 }
