@@ -15,24 +15,22 @@
   "duration_sec",
   "elevation_gain",
   "calories",
-  "avg_heart_rate",
-  "max_heart_rate",
   "notes",
   "gpx_file",
   "route_points",
   "strava_id",
-  "avg_cadence",
-  "max_cadence",
-  "avg_temperature",
-  "perceived_exertion",
-  "training_load",
-  "avg_watts",
-  "max_watts",
-  "avg_speed",
-  "max_speed",
-  "avg_grade",
-  "elevation_loss",
-  "relative_effort"
+  "gear",
+  "weather_condition",
+  "weather_temp",
+  "apparent_temp",
+  "humidity",
+  "wind_speed",
+  "wind_gust",
+  "wind_bearing",
+  "cloud_cover",
+  "uv_index",
+  "sunrise_time",
+  "sunset_time"
  ],
  "fields": [
   {
@@ -84,16 +82,6 @@
    "label": "Calories"
   },
   {
-   "fieldname": "avg_heart_rate",
-   "fieldtype": "Float",
-   "label": "Avg Heart Rate (bpm)"
-  },
-  {
-   "fieldname": "max_heart_rate",
-   "fieldtype": "Float",
-   "label": "Max Heart Rate (bpm)"
-  },
-  {
    "fieldname": "notes",
    "fieldtype": "Text Editor",
    "label": "Notes"
@@ -115,70 +103,70 @@
    "read_only": 1
   },
   {
-   "fieldname": "avg_cadence",
-   "fieldtype": "Float",
-   "label": "Avg Cadence (spm)"
+   "fieldname": "gear",
+   "fieldtype": "Data",
+   "label": "Gear"
   },
   {
-   "fieldname": "max_cadence",
-   "fieldtype": "Float",
-   "label": "Max Cadence (spm)"
+   "fieldname": "weather_condition",
+   "fieldtype": "Data",
+   "label": "Weather Condition"
   },
   {
-   "fieldname": "avg_temperature",
+   "fieldname": "weather_temp",
    "fieldtype": "Float",
-   "label": "Avg Temperature (\u00b0C)"
+   "label": "Weather Temp (\u00b0C)"
   },
   {
-   "fieldname": "perceived_exertion",
+   "fieldname": "apparent_temp",
    "fieldtype": "Float",
-   "label": "Perceived Exertion"
+   "label": "Apparent Temp (\u00b0C)"
   },
   {
-   "fieldname": "training_load",
+   "fieldname": "humidity",
    "fieldtype": "Float",
-   "label": "Training Load"
+   "label": "Humidity (%)"
   },
   {
-   "fieldname": "avg_watts",
+   "fieldname": "wind_speed",
    "fieldtype": "Float",
-   "label": "Avg Power (W)"
+   "label": "Wind Speed (m/s)"
   },
   {
-   "fieldname": "max_watts",
+   "fieldname": "wind_gust",
    "fieldtype": "Float",
-   "label": "Max Power (W)"
+   "label": "Wind Gust (m/s)"
   },
   {
-   "fieldname": "avg_speed",
+   "fieldname": "wind_bearing",
    "fieldtype": "Float",
-   "label": "Avg Speed (m/s)"
+   "label": "Wind Bearing (\u00b0)"
   },
   {
-   "fieldname": "max_speed",
+   "fieldname": "cloud_cover",
    "fieldtype": "Float",
-   "label": "Max Speed (m/s)"
+   "label": "Cloud Cover"
   },
   {
-   "fieldname": "avg_grade",
+   "fieldname": "uv_index",
    "fieldtype": "Float",
-   "label": "Avg Grade (%)"
+   "label": "UV Index"
   },
   {
-   "fieldname": "elevation_loss",
-   "fieldtype": "Float",
-   "label": "Elevation Loss (m)"
+   "fieldname": "sunrise_time",
+   "fieldtype": "Data",
+   "label": "Sunrise Time"
   },
   {
-   "fieldname": "relative_effort",
-   "fieldtype": "Float",
-   "label": "Relative Effort"
+   "fieldname": "sunset_time",
+   "fieldtype": "Data",
+   "label": "Sunset Time"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-21 00:00:00.000000",
+ "modified": "2026-04-26 21:21:36.238620",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "Run",
