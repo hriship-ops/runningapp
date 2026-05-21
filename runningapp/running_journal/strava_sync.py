@@ -1,18 +1,68 @@
+"""
+strava_sync.py
+--------------
+Strava sync for Running Journal.
+
+For each new activity:
+  1. List endpoint    → activity metadata
+  2. Detail endpoint  → real calories, gear, suffer_score
+  3. Streams endpoint → full per-point data (all 11 keys, no cap)
+  4. Computed fields  → VDOT, TRIMP, Keytel calories fallback
+
+Analytics formulae:
+  - Calories: Keytel et al. (2005) Heart-rate based if HR available
+  - Calories fallback: MET-based (Pandolf et al. 1977 adapted)
+  - VDOT: Jack Daniels & Gilbert (1979) performance-based VO2max proxy
+  - TRIMP: Banister et al. (1991) training impulse
+"""
+
 import frappe
 import requests
 import json
+import math
 from datetime import datetime
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
 SETTINGS = "Run Settings"
 
 
+# ── Settings helpers ──────────────────────────────────────────────────────────
 def get_settings_value(field):
     return frappe.db.get_single_value(SETTINGS, field)
 
+def compute_age(dob, activity_date):
+    """Compute age at time of activity — not today's age."""
+    if not dob:
+        return 35
+    if isinstance(activity_date, str):
+        activity_date = datetime.strptime(activity_date[:10], "%Y-%m-%d").date()
+    if hasattr(dob, 'year'):
+        pass  # already a date
+    else:
+        dob = datetime.strptime(str(dob)[:10], "%Y-%m-%d").date()
+    age = activity_date.year - dob.year
+    if (activity_date.month, activity_date.day) < (dob.month, dob.day):
+        age -= 1
+    return max(1, age)
 
+
+def get_analytics_settings():
+    try:
+        dob = get_settings_value("date_of_birth")
+        return {
+            "weight":     float(get_settings_value("weight_kg") or 70),
+            "dob":        dob or "1975-04-20",
+            "gender":     get_settings_value("gender") or "Male",
+            "resting_hr": int(get_settings_value("resting_hr") or 50),
+            "max_hr":     int(get_settings_value("max_hr_override") or 0),
+        }
+    except:
+        return {"weight": 70, "dob": "1975-04-20", "gender": "Male", "resting_hr": 50, "max_hr": 0}
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
 def get_valid_access_token():
-    client_id = get_settings_value("strava_client_id")
+    client_id    = get_settings_value("strava_client_id")
     access_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_access_token")
     test = requests.get(
         "https://www.strava.com/api/v3/athlete",
@@ -22,10 +72,10 @@ def get_valid_access_token():
         client_secret = get_decrypted_password(SETTINGS, SETTINGS, "strava_client_secret")
         refresh_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_refresh_token")
         r = requests.post("https://www.strava.com/oauth/token", data={
-            "client_id": client_id,
+            "client_id":     client_id,
             "client_secret": client_secret,
             "refresh_token": refresh_token,
-            "grant_type": "refresh_token"
+            "grant_type":    "refresh_token"
         })
         tokens = r.json()
         set_encrypted_password(SETTINGS, SETTINGS, tokens["access_token"], "strava_access_token")
@@ -35,20 +85,18 @@ def get_valid_access_token():
     return access_token
 
 
-def fetch_activities(per_page=50, page=1, after=None):
+# ── API fetchers ──────────────────────────────────────────────────────────────
+def fetch_activities(per_page=50, page=1):
     token = get_valid_access_token()
-    params = {"per_page": per_page, "page": page}
-    if after:
-        params["after"] = int(after.timestamp()) if isinstance(after, datetime) else after
     r = requests.get(
         "https://www.strava.com/api/v3/activities",
         headers={"Authorization": f"Bearer {token}"},
-        params=params
+        params={"per_page": per_page, "page": page}
     )
     return r.json()
 
-
 def fetch_activity_detail(activity_id):
+    """Detail endpoint — returns real calories, gear, suffer_score, description."""
     token = get_valid_access_token()
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}",
@@ -58,17 +106,22 @@ def fetch_activity_detail(activity_id):
         return r.json()
     return {}
 
-
 def fetch_activity_streams(activity_id):
+    """
+    Fetch all available stream keys — no artificial point cap.
+    Returns per-point data for the full activity.
+    """
     token = get_valid_access_token()
+    keys = "latlng,altitude,time,heartrate,cadence,watts,temp,grade_smooth,velocity_smooth,moving,distance"
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
-        params={"keys": "latlng,altitude,time,heartrate", "key_by_type": "true"}
+        params={"keys": keys, "key_by_type": "true"}
     )
-    return r.json()
+    return r.json() if r.status_code == 200 else {}
 
 
+# ── Geocoding ─────────────────────────────────────────────────────────────────
 def get_location(lat, lon):
     try:
         r = requests.get(
@@ -91,112 +144,246 @@ def get_location(lat, lon):
         return ""
 
 
-def calculate_calories(distance_km, duration_sec, activity_type):
-    try:
-        weight = get_settings_value("weight_kg") or 70
-        age = get_settings_value("age") or 35
-        gender = get_settings_value("gender") or "Male"
-        age_factor = 1.0 - (max(0, age - 30) * 0.005)
-        gender_factor = 1.0 if gender == "Male" else 0.9
-        if activity_type == "Swimming":
-            hours = duration_sec / 3600
-            calories = 8.0 * weight * hours * age_factor * gender_factor
-        else:
-            calories = weight * distance_km * 1.036 * age_factor * gender_factor
-        return round(calories)
-    except:
-        return 0
+# ── Analytics formulae ────────────────────────────────────────────────────────
+def compute_calories_keytel(avg_hr, duration_sec, weight, age, gender):
+    """
+    Keytel et al. (2005) J Sports Sci 23(3):289-97.
+    HR-based calorie estimation — accounts for effort intensity.
+    """
+    if not avg_hr or avg_hr <= 0:
+        return 0, "formula_no_hr"
+    mins = duration_sec / 60.0
+    if gender == "Male":
+        kcal_per_min = (-55.0969 + 0.6309 * avg_hr + 0.1988 * weight + 0.2017 * age) / 4.184
+    else:
+        kcal_per_min = (-20.4022 + 0.4472 * avg_hr + 0.1263 * weight - 0.0740 * age) / 4.184
+    return max(0, round(kcal_per_min * mins)), "keytel_2005"
+
+def compute_calories_met(distance_km, duration_sec, avg_grade, weight, activity_type):
+    """
+    MET-based fallback. Pandolf et al. (1977) adapted.
+    Used when HR is unavailable.
+    """
+    if duration_sec <= 0:
+        return 0, "formula_zero_duration"
+    hours = duration_sec / 3600.0
+    speed_ms = (distance_km * 1000 / duration_sec) if duration_sec > 0 else 0
+    if activity_type == "Swimming":
+        met = 8.0
+    elif activity_type == "Cycling":
+        met = max(1.0, 6.0 + speed_ms * 0.5)
+    else:
+        grade_frac = (avg_grade or 0) / 100.0
+        met = max(1.0, 1.0 + speed_ms * 0.2 + grade_frac * speed_ms * 0.9)
+    return max(0, round(met * weight * hours)), "met_pandolf"
+
+def compute_vdot(distance_km, duration_sec):
+    """
+    Jack Daniels & Gilbert (1979) VDOT formula.
+    Performance-based aerobic capacity proxy.
+    Only computed for runs >= 1km, >= 4 minutes.
+    """
+    if distance_km < 1.0 or duration_sec < 240:
+        return None
+    velocity  = (distance_km * 1000) / (duration_sec / 60.0)
+    t         = duration_sec / 60.0
+    vo2       = -4.60 + 0.182258 * velocity + 0.000104 * velocity ** 2
+    pct_vo2max = 0.8 + 0.1894393 * math.exp(-0.012778 * t) + 0.2989558 * math.exp(-0.1932605 * t)
+    if pct_vo2max <= 0:
+        return None
+    vdot = vo2 / pct_vo2max
+    return round(vdot, 1) if vdot > 0 else None
+
+def compute_trimp(avg_hr, duration_sec, resting_hr, max_hr, gender):
+    """
+    Banister et al. (1991) TRIMP — Training Impulse.
+    Weights duration by HR intensity.
+    """
+    if not avg_hr or not resting_hr or not max_hr:
+        return None
+    if max_hr <= resting_hr:
+        return None
+    hr_ratio = (avg_hr - resting_hr) / (max_hr - resting_hr)
+    if hr_ratio <= 0 or hr_ratio > 1:
+        return None
+    mins = duration_sec / 60.0
+    if gender == "Male":
+        trimp = mins * hr_ratio * 0.64 * math.exp(1.92 * hr_ratio)
+    else:
+        trimp = mins * hr_ratio * 0.86 * math.exp(1.67 * hr_ratio)
+    return round(trimp, 1)
 
 
-def activity_to_run(activity, streams=None):
-    type_map = {
-        "Run": "Run", "TrailRun": "Run", "VirtualRun": "Run",
-        "Swim": "Swimming", "Ride": "Cycling", "VirtualRide": "Cycling",
-        "Walk": "Walk"
-    }
-    activity_type = type_map.get(activity.get("type", ""), "Run")
-    distance_km = round((activity.get("distance", 0) or 0) / 1000, 3)
-    duration_sec = activity.get("moving_time", 0) or 0
-    elevation_gain = round(activity.get("total_elevation_gain", 0) or 0)
-    start_date = activity.get("start_date_local", "")[:10]
-    run_name = activity.get("name", f"{activity_type} {start_date}")
+# ── Route points builder ──────────────────────────────────────────────────────
+def build_route_points(streams):
+    """
+    Build route_points list from Strava streams.
+    No point cap — store all points Strava returns.
+    Each point: {lat, lon, ele, t, hr, spd, dst, cad, pwr, tmp, grd, mov}
+    """
+    if not streams or "latlng" not in streams:
+        return []
+
+    latlng   = streams.get("latlng",          {}).get("data", [])
+    alt      = streams.get("altitude",         {}).get("data", [])
+    time_s   = streams.get("time",             {}).get("data", [])
+    hr       = streams.get("heartrate",        {}).get("data", [])
+    cadence  = streams.get("cadence",          {}).get("data", [])
+    watts    = streams.get("watts",            {}).get("data", [])
+    temp     = streams.get("temp",             {}).get("data", [])
+    grade    = streams.get("grade_smooth",     {}).get("data", [])
+    velocity = streams.get("velocity_smooth",  {}).get("data", [])
+    moving   = streams.get("moving",           {}).get("data", [])
+    distance = streams.get("distance",         {}).get("data", [])
+
+    route_points = []
+    for i in range(len(latlng)):
+        pt = {
+            "lat": latlng[i][0],
+            "lon": latlng[i][1],
+        }
+        if i < len(alt)      and alt[i]      is not None: pt["ele"] = round(alt[i], 1)
+        if i < len(time_s)   and time_s[i]   is not None: pt["t"]   = time_s[i]
+        if i < len(hr)       and hr[i]        is not None: pt["hr"]  = int(hr[i])
+        if i < len(velocity) and velocity[i]  is not None: pt["spd"] = round(velocity[i], 3)
+        if i < len(distance) and distance[i]  is not None: pt["dst"] = round(distance[i], 1)
+        if i < len(cadence)  and cadence[i]   is not None: pt["cad"] = int(cadence[i])
+        if i < len(watts)    and watts[i]     is not None: pt["pwr"] = int(watts[i])
+        if i < len(temp)     and temp[i]      is not None: pt["tmp"] = temp[i]
+        if i < len(grade)    and grade[i]     is not None: pt["grd"] = round(grade[i], 2)
+        if i < len(moving)   and moving[i]    is not None: pt["mov"] = 1 if moving[i] else 0
+        route_points.append(pt)
+
+    return route_points
+
+
+# ── Activity type map ─────────────────────────────────────────────────────────
+TYPE_MAP = {
+    "Run": "Run", "TrailRun": "Run", "VirtualRun": "Run",
+    "Swim": "Swimming", "Swimming": "Swimming",
+    "Ride": "Cycling", "VirtualRide": "Cycling",
+    "Walk": "Walk", "Hike": "Walk",
+}
+
+
+# ── Main activity builder ─────────────────────────────────────────────────────
+def activity_to_run(activity, detail, streams, settings):
+    """
+    Build a Run doc dict from list + detail + streams data.
+    detail overrides list for calories.
+    FIT session data not available here — streams is our best source.
+    """
+    activity_type = TYPE_MAP.get(activity.get("type", ""), "Run")
+    distance_km   = round((activity.get("distance", 0) or 0) / 1000, 3)
+    duration_sec  = activity.get("moving_time", 0) or 0
+    elev_gain     = round(activity.get("total_elevation_gain", 0) or 0)
+    start_date    = activity.get("start_date_local", "")[:10]
+    run_name      = activity.get("name", f"{activity_type} {start_date}")
+
+    avg_hr    = round(activity.get("average_heartrate", 0) or 0)
+    max_hr_val= round(activity.get("max_heartrate", 0) or 0)
+    avg_speed = activity.get("average_speed", 0) or 0
+    max_speed = activity.get("max_speed", 0) or 0
+
+    # Location
     location = ""
     start_latlng = activity.get("start_latlng", [])
     if start_latlng and len(start_latlng) == 2:
         location = get_location(start_latlng[0], start_latlng[1])
 
-    # Fetch detail endpoint to get real calories (list endpoint never returns calories)
-    calories = 0
-    detail = fetch_activity_detail(activity["id"])
-    if detail:
-        calories = detail.get("calories", 0) or 0
+    # Calories — detail endpoint first, then Keytel, then MET
+    calories       = int(detail.get("calories", 0) or 0)
+    calorie_source = "strava_detail" if calories > 0 else ""
+    if not calories and avg_hr > 0:
+        age_at_activity = compute_age(settings['dob'], start_date)
+    calories, calorie_source = compute_calories_keytel(
+            avg_hr, duration_sec, settings['weight'], age_at_activity, settings['gender']
+        )
     if not calories:
-        calories = calculate_calories(distance_km, duration_sec, activity_type)
+        calories, calorie_source = compute_calories_met(
+            distance_km, duration_sec, 0, settings['weight'], activity_type
+        )
 
-    avg_heart_rate = round(activity.get("average_heartrate", 0) or 0)
-    max_heart_rate = round(activity.get("max_heartrate", 0) or 0)
+    # Additional detail fields
+    description  = detail.get("description", "") or ""
+    suffer_score = detail.get("suffer_score", 0) or 0
+    gear_name    = (detail.get("gear") or {}).get("name", "") or ""
 
-    route_points = []
-    if streams and "latlng" in streams:
-        latlng_data = streams["latlng"].get("data", [])
-        alt_data = streams.get("altitude", {}).get("data", [])
-        time_data = streams.get("time", {}).get("data", [])
-        hr_data = streams.get("heartrate", {}).get("data", [])
-        step = max(1, len(latlng_data) // 500)
-        for i in range(0, len(latlng_data), step):
-            pt = {"lat": latlng_data[i][0], "lon": latlng_data[i][1]}
-            if i < len(alt_data):
-                pt["ele"] = alt_data[i]
-            if i < len(time_data):
-                pt["t"] = time_data[i]
-            if i < len(hr_data):
-                pt["hr"] = hr_data[i]
-            route_points.append(pt)
+    # Computed analytics
+    vdot = compute_vdot(distance_km, duration_sec) if activity_type == "Run" else None
+    effective_max_hr = settings['max_hr'] or max_hr_val or 0
+    trimp = compute_trimp(avg_hr, duration_sec, settings['resting_hr'], effective_max_hr, settings['gender'])
 
-    return {
-        "doctype": "Run",
-        "run_name": run_name,
-        "date": start_date,
-        "activity_type": activity_type,
-        "location": location,
-        "distance_km": distance_km,
-        "duration_sec": duration_sec,
-        "elevation_gain": elevation_gain,
-        "calories": calories,
-        "avg_heart_rate": avg_heart_rate,
-        "max_heart_rate": max_heart_rate,
-        "route_points": json.dumps(route_points) if route_points else "",
-        "strava_id": str(activity.get("id", ""))
+    # Route points from streams
+    route_points = build_route_points(streams)
+
+    run_doc = {
+        "doctype":            "Run",
+        "run_name":           run_name,
+        "date":               start_date,
+        "activity_type":      activity_type,
+        "location":           location,
+        "distance_km":        distance_km,
+        "duration_sec":       duration_sec,
+        "elevation_gain":     elev_gain,
+        "calories":           calories,
+        "calorie_source":     calorie_source,
+        "avg_heart_rate":     avg_hr,
+        "max_heart_rate":     max_hr_val,
+        "avg_speed":          avg_speed,
+        "max_speed":          max_speed,
+        "relative_effort":    suffer_score,
+        "strava_id":          str(activity.get("id", "")),
+        "route_points":       json.dumps(route_points) if route_points else "",
     }
 
+    if description:  run_doc["notes"] = description
+    if gear_name:    run_doc["gear"]  = gear_name
+    if vdot:         run_doc["vdot"]  = vdot
+    if trimp:        run_doc["trimp"] = trimp
 
+    return run_doc
+
+
+# ── Sync ──────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
 def sync_strava(full_sync=False):
+    settings = get_analytics_settings()
     imported = 0
-    skipped = 0
-    page = 1
+    skipped  = 0
+    page     = 1
+
     while True:
-        activities = fetch_activities(per_page=50, page=page, after=None)
+        activities = fetch_activities(per_page=50, page=page)
         if not activities or not isinstance(activities, list):
             break
+
         for activity in activities:
             strava_id = str(activity.get("id", ""))
+
             if frappe.db.exists("Run", {"strava_id": strava_id}):
                 skipped += 1
                 continue
-            if activity.get("type") not in ["Run", "TrailRun", "VirtualRun", "Swim", "Ride", "VirtualRide", "Walk"]:
+
+            if activity.get("type") not in TYPE_MAP:
                 skipped += 1
                 continue
+
+            # Fetch detail and streams for every new activity
+            detail  = fetch_activity_detail(activity["id"])
             streams = {}
             if activity.get("start_latlng"):
                 streams = fetch_activity_streams(activity["id"])
-            run_data = activity_to_run(activity, streams)
+
+            run_data = activity_to_run(activity, detail, streams, settings)
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
             imported += 1
+
         if len(activities) < 50:
             break
         page += 1
+
     frappe.db.set_single_value(SETTINGS, "strava_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped}
