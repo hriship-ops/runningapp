@@ -296,7 +296,7 @@ def activity_to_run(activity, detail, streams, settings):
     calorie_source = "strava_detail" if calories > 0 else ""
     if not calories and avg_hr > 0:
         age_at_activity = compute_age(settings['dob'], start_date)
-    calories, calorie_source = compute_calories_keytel(
+        calories, calorie_source = compute_calories_keytel(
             avg_hr, duration_sec, settings['weight'], age_at_activity, settings['gender']
         )
     if not calories:
