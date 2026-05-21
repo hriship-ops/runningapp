@@ -18,7 +18,10 @@
   "strava_client_secret",
   "strava_access_token",
   "strava_refresh_token",
-  "strava_last_sync"
+  "strava_last_sync",
+  "resting_hr",
+  "max_hr_override",
+  "date_of_birth"
  ],
  "fields": [
   {
@@ -90,13 +93,28 @@
    "fieldname": "strava_last_sync",
    "fieldtype": "Datetime",
    "label": "Strava Last Sync"
+  },
+  {
+   "fieldname": "resting_hr",
+   "fieldtype": "Int",
+   "label": "Resting HR (bpm)"
+  },
+  {
+   "fieldname": "max_hr_override",
+   "fieldtype": "Int",
+   "label": "Max HR Override"
+  },
+  {
+   "fieldname": "date_of_birth",
+   "fieldtype": "Date",
+   "label": "Date of Birth"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-16 13:30:14.879480",
+ "modified": "2026-05-21 20:03:12.986011",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "Run Settings",
