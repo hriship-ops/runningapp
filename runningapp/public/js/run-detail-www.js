@@ -57,8 +57,8 @@ function rdStat(label, val, unit, accent) {
 
 function rdInitMap(pts) {
     var map = L.map('rd-map', {zoomControl:true, scrollWheelZoom:false});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution:'© CartoDB', maxZoom:18
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'© OpenStreetMap contributors', maxZoom:18
     }).addTo(map);
     var latlngs = pts.map(function(p) { return [p.lat, p.lon || p.lng]; });
     var poly = L.polyline(latlngs, {color:'#ea580c', weight:3, opacity:0.9}).addTo(map);
