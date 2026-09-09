@@ -576,10 +576,8 @@ function rwTickerPrev() {
 }
 
 /* ── GARMIN SYNC ── */
-function rwSyncStrava() {
-    var btn = document.getElementById('rw-sync-btn');
-    if (btn) btn.textContent = 'Syncing...';
-    fetch('/api/method/runningapp.running_journal.garmin_sync.sync_garmin_public', { method: 'GET' })
+function rwSyncStravaOnce() {
+    return fetch('/api/method/runningapp.running_journal.garmin_sync.sync_garmin_public', { method: 'GET' })
     .then(function(r) {
         if (!r.ok) {
             return r.json().catch(function() { return {}; }).then(function(body) {
@@ -589,12 +587,31 @@ function rwSyncStrava() {
         }
         return r.json();
     })
-    .then(function(data) {
+    .then(function(data) { return data.message || data; });
+}
+
+function rwSyncStrava() {
+    var btn = document.getElementById('rw-sync-btn');
+    var totalImported = 0;
+
+    function step() {
+        if (btn) btn.textContent = totalImported > 0 ? ('Syncing... (' + totalImported + ' so far)') : 'Syncing...';
+        return rwSyncStravaOnce().then(function(result) {
+            totalImported += result.imported || 0;
+            if (result.more_pending) {
+                return step();
+            }
+        });
+    }
+
+    step()
+    .then(function() {
         if (btn) btn.textContent = '↻ Sync Garmin';
         rwLoadAllRuns(); rwSearch(); rwLoadTicker();
     })
     .catch(function(err) {
         if (btn) btn.textContent = '↻ Sync Garmin';
-        alert('Garmin sync failed: ' + (err && err.message ? err.message : 'unknown error'));
+        alert('Garmin sync failed: ' + (err && err.message ? err.message : 'unknown error') + (totalImported > 0 ? (' (' + totalImported + ' imported before the error)') : ''));
+        rwLoadAllRuns(); rwSearch(); rwLoadTicker();
     });
 }

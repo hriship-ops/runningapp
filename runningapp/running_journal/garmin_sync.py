@@ -21,6 +21,7 @@ synced via Strava (or manually backfilled) under a different source ID.
 import os
 import json
 import gzip
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
@@ -41,6 +42,15 @@ SETTINGS = "Run Settings"
 TCX_NS = "{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}"
 MAX_POINTS = 500
 PAGE_SIZE = 20
+
+# A first-time backfill can have hundreds of activities, each needing a TCX
+# download + reverse-geocode call — that can easily blow past gunicorn's
+# request timeout (120s) and nginx's proxy_read_timeout (120s) if run in one
+# shot. So a single sync call does at most this much work and returns; the
+# caller (button click, or a resync) picks up where it left off, since
+# already-imported activities are skipped by garmin_id on the next call.
+MAX_IMPORTS_PER_CALL = 15
+TIME_BUDGET_SEC = 90
 
 GARMIN_TYPE_MAP = {
     "running": "Run", "trail_running": "Run", "track_running": "Run",
@@ -217,13 +227,23 @@ def sync_garmin(full_sync=False):
     imported = 0
     skipped = 0
     start = 0
+    t_start = time.monotonic()
+    more_pending = False
 
     while True:
+        if imported >= MAX_IMPORTS_PER_CALL or (time.monotonic() - t_start) > TIME_BUDGET_SEC:
+            more_pending = True
+            break
+
         activities = client.get_activities(start, PAGE_SIZE)
         if not activities or not isinstance(activities, list):
             break
 
         for activity in activities:
+            if imported >= MAX_IMPORTS_PER_CALL or (time.monotonic() - t_start) > TIME_BUDGET_SEC:
+                more_pending = True
+                break
+
             garmin_id = str(activity.get("activityId", ""))
             if not garmin_id or frappe.db.exists("Run", {"garmin_id": garmin_id}):
                 skipped += 1
@@ -254,14 +274,19 @@ def sync_garmin(full_sync=False):
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
             imported += 1
+            # Commit after every insert: a single sync call can be cut off
+            # by a request timeout on a large backlog, and this ensures
+            # nothing already imported is lost when that happens.
+            frappe.db.commit()
 
-        if len(activities) < PAGE_SIZE:
+        if more_pending or len(activities) < PAGE_SIZE:
             break
         start += PAGE_SIZE
 
-    frappe.db.set_single_value(SETTINGS, "garmin_last_sync", datetime.now())
-    frappe.db.commit()
-    return {"imported": imported, "skipped": skipped}
+    if not more_pending:
+        frappe.db.set_single_value(SETTINGS, "garmin_last_sync", datetime.now())
+        frappe.db.commit()
+    return {"imported": imported, "skipped": skipped, "more_pending": more_pending}
 
 
 @frappe.whitelist(allow_guest=True)
