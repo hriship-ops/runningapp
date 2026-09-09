@@ -20,7 +20,7 @@ function rdRender(run) {
     var splits = rdCalcSplits(pts, run.duration_sec, run.distance_km);
     var title = rdMakeTitle(run.date, run.location, run.activity_type);
     var dateStr = run.date ? new Date(run.date + 'T12:00:00').toLocaleDateString('en-US', {day:'numeric', month:'short', year:'numeric'}) : '';
-    var hasAlt = pts.length > 0 && pts[0].ele != null;
+    var hasAlt = pts.some(function(p) { return p.ele != null && !isNaN(p.ele); });
 
     document.getElementById('rd-title').textContent = title;
     document.getElementById('rd-meta').textContent = dateStr + (run.location ? ' · ' + run.location : '');
@@ -68,10 +68,12 @@ function rdInitMap(pts) {
 }
 
 function rdDrawElevation(pts) {
-    var alts = pts.map(function(p) { return p.ele; });
+    var elevPts = pts.filter(function(p) { return p.ele != null && !isNaN(p.ele); });
+    if (elevPts.length < 2) return;
+    var alts = elevPts.map(function(p) { return p.ele; });
     var mn = Math.min.apply(null, alts), mx = Math.max.apply(null, alts);
     var W = 820, H = 80, pad = 4;
-    var sx = function(i) { return (i / (pts.length-1)) * W; };
+    var sx = function(i) { return (i / (elevPts.length-1)) * W; };
     var sy = function(a) { return H - pad - ((a-mn)/(mx-mn||1)) * (H-pad*2); };
     var d = 'M0,' + sy(alts[0]);
     for (var i = 1; i < alts.length; i++) d += ' L' + sx(i).toFixed(1) + ',' + sy(alts[i]).toFixed(1);
