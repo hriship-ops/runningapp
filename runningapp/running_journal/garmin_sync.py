@@ -173,8 +173,18 @@ def activity_to_run(activity, points, settings):
     start_date = (activity.get("startTimeLocal", "") or "")[:10]
     run_name = activity.get("activityName") or f"{activity_type} {start_date}"
 
-    avg_hr = round(activity.get("averageHR", 0) or 0)
+    avg_hr = round(activity.get("avgHR", 0) or 0)
     max_hr_val = round(activity.get("maxHR", 0) or 0)
+    if (not avg_hr or not max_hr_val) and points:
+        # Fall back to deriving HR from the route points themselves — the
+        # TCX per-point data has proven reliable even when a summary field
+        # name turns out to be wrong or missing for a given activity type.
+        hr_vals = [p["hr"] for p in points if p.get("hr")]
+        if hr_vals:
+            if not avg_hr:
+                avg_hr = round(sum(hr_vals) / len(hr_vals))
+            if not max_hr_val:
+                max_hr_val = max(hr_vals)
 
     location = ""
     if points:
