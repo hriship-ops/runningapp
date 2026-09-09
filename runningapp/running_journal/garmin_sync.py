@@ -220,13 +220,20 @@ def activity_to_run(activity, points, settings):
 
 
 # ── Sync ─────────────────────────────────────────────────────────────────────
+CURSOR_FIELD = "garmin_sync_cursor"
+
+
 @frappe.whitelist()
 def sync_garmin(full_sync=False):
     client = get_garmin_client()
     settings = get_analytics_settings()
     imported = 0
     skipped = 0
-    start = 0
+    # Resume from where the last (possibly time-boxed) call left off, instead
+    # of rescanning the whole history from the most recent activity every
+    # time — on a large backlog that rescan cost grows every call and starts
+    # eating the entire time budget before reaching any new activities.
+    start = int(frappe.db.get_single_value(SETTINGS, CURSOR_FIELD) or 0)
     t_start = time.monotonic()
     more_pending = False
 
@@ -283,9 +290,16 @@ def sync_garmin(full_sync=False):
             break
         start += PAGE_SIZE
 
-    if not more_pending:
+    if more_pending:
+        # Save the resume point for the next call.
+        frappe.db.set_single_value(SETTINGS, CURSOR_FIELD, start)
+    else:
+        # Reached the end of Garmin's history — reset so the next sync
+        # (periodic, catching new activities) starts from the most recent
+        # activity again instead of resuming from the tail forever.
+        frappe.db.set_single_value(SETTINGS, CURSOR_FIELD, 0)
         frappe.db.set_single_value(SETTINGS, "garmin_last_sync", datetime.now())
-        frappe.db.commit()
+    frappe.db.commit()
     return {"imported": imported, "skipped": skipped, "more_pending": more_pending}
 
 

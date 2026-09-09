@@ -24,7 +24,8 @@
   "date_of_birth",
   "garmin_email",
   "garmin_password",
-  "garmin_last_sync"
+  "garmin_last_sync",
+  "garmin_sync_cursor"
  ],
  "fields": [
   {
@@ -126,6 +127,12 @@
    "fieldname": "garmin_last_sync",
    "fieldtype": "Datetime",
    "label": "Garmin Last Sync"
+  },
+  {
+   "fieldname": "garmin_sync_cursor",
+   "fieldtype": "Int",
+   "label": "Garmin Sync Cursor",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
