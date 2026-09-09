@@ -319,3 +319,41 @@ def sync_garmin_public():
     if user == "Guest":
         frappe.throw("Login required", frappe.AuthenticationError)
     return sync_garmin(full_sync=False)
+
+
+# ── One-off backfill ─────────────────────────────────────────────────────────
+def backfill_hr_from_points():
+    """Fix avg_heart_rate/max_heart_rate/trimp for Garmin runs imported before
+    the avgHR field-name bug fix — recomputed from each run's own stored
+    route_points, no Garmin API access needed. Safe to run via
+    `bench execute runningapp.running_journal.garmin_sync.backfill_hr_from_points`.
+    """
+    settings = get_analytics_settings()
+    runs = frappe.get_all(
+        "Run",
+        filters={"garmin_id": ["!=", ""], "avg_heart_rate": 0},
+        fields=["name", "route_points", "activity_type", "distance_km", "duration_sec", "date"],
+    )
+    updated = 0
+    for run in runs:
+        if not run.route_points:
+            continue
+        try:
+            points = json.loads(run.route_points)
+        except Exception:
+            continue
+        hr_vals = [p["hr"] for p in points if isinstance(p, dict) and p.get("hr")]
+        if not hr_vals:
+            continue
+        avg_hr = round(sum(hr_vals) / len(hr_vals))
+        max_hr_val = max(hr_vals)
+        effective_max_hr = settings["max_hr"] or max_hr_val or 0
+        trimp = compute_trimp(avg_hr, run.duration_sec, settings["resting_hr"], effective_max_hr, settings["gender"])
+        frappe.db.set_value(
+            "Run", run.name,
+            {"avg_heart_rate": avg_hr, "max_heart_rate": max_hr_val, "trimp": trimp or 0},
+            update_modified=False,
+        )
+        updated += 1
+    frappe.db.commit()
+    return {"updated": updated, "checked": len(runs)}
