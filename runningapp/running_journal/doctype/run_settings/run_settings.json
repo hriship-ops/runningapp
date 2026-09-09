@@ -21,7 +21,10 @@
   "strava_last_sync",
   "resting_hr",
   "max_hr_override",
-  "date_of_birth"
+  "date_of_birth",
+  "garmin_email",
+  "garmin_password",
+  "garmin_last_sync"
  ],
  "fields": [
   {
@@ -108,6 +111,21 @@
    "fieldname": "date_of_birth",
    "fieldtype": "Date",
    "label": "Date of Birth"
+  },
+  {
+   "fieldname": "garmin_email",
+   "fieldtype": "Data",
+   "label": "Garmin Email"
+  },
+  {
+   "fieldname": "garmin_password",
+   "fieldtype": "Password",
+   "label": "Garmin Password"
+  },
+  {
+   "fieldname": "garmin_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Garmin Last Sync"
   }
  ],
  "grid_page_length": 50,

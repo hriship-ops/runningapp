@@ -575,11 +575,11 @@ function rwTickerPrev() {
     if (rwState.tickerPage > 0) { rwState.tickerPage--; rwRenderTicker(); }
 }
 
-/* ── STRAVA SYNC ── */
+/* ── GARMIN SYNC ── */
 function rwSyncStrava() {
     var btn = document.getElementById('rw-sync-btn');
     if (btn) btn.textContent = 'Syncing...';
-    fetch('/api/method/runningapp.running_journal.strava_sync.sync_strava_public', { method: 'GET' })
+    fetch('/api/method/runningapp.running_journal.garmin_sync.sync_garmin_public', { method: 'GET' })
     .then(function(r) {
         if (!r.ok) {
             return r.json().catch(function() { return {}; }).then(function(body) {
@@ -590,11 +590,11 @@ function rwSyncStrava() {
         return r.json();
     })
     .then(function(data) {
-        if (btn) btn.textContent = '↻ Sync Strava';
+        if (btn) btn.textContent = '↻ Sync Garmin';
         rwLoadAllRuns(); rwSearch(); rwLoadTicker();
     })
     .catch(function(err) {
-        if (btn) btn.textContent = '↻ Sync Strava';
-        alert('Strava sync failed: ' + (err && err.message ? err.message : 'unknown error'));
+        if (btn) btn.textContent = '↻ Sync Garmin';
+        alert('Garmin sync failed: ' + (err && err.message ? err.message : 'unknown error'));
     });
 }

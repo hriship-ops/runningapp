@@ -19,6 +19,7 @@
   "gpx_file",
   "route_points",
   "strava_id",
+  "garmin_id",
   "gear",
   "weather_condition",
   "weather_temp",
@@ -100,6 +101,12 @@
    "fieldname": "strava_id",
    "fieldtype": "Data",
    "label": "Strava ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "garmin_id",
+   "fieldtype": "Data",
+   "label": "Garmin ID",
    "read_only": 1
   },
   {
