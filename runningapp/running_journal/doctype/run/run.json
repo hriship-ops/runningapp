@@ -15,6 +15,14 @@
   "duration_sec",
   "elevation_gain",
   "calories",
+  "calorie_source",
+  "avg_heart_rate",
+  "max_heart_rate",
+  "avg_speed",
+  "max_speed",
+  "relative_effort",
+  "vdot",
+  "trimp",
   "notes",
   "gpx_file",
   "route_points",
@@ -81,6 +89,49 @@
    "fieldname": "calories",
    "fieldtype": "Float",
    "label": "Calories"
+  },
+  {
+   "fieldname": "calorie_source",
+   "fieldtype": "Data",
+   "label": "Calorie Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "avg_heart_rate",
+   "fieldtype": "Int",
+   "label": "Avg Heart Rate"
+  },
+  {
+   "fieldname": "max_heart_rate",
+   "fieldtype": "Int",
+   "label": "Max Heart Rate"
+  },
+  {
+   "fieldname": "avg_speed",
+   "fieldtype": "Float",
+   "label": "Avg Speed (m/s)"
+  },
+  {
+   "fieldname": "max_speed",
+   "fieldtype": "Float",
+   "label": "Max Speed (m/s)"
+  },
+  {
+   "fieldname": "relative_effort",
+   "fieldtype": "Float",
+   "label": "Relative Effort"
+  },
+  {
+   "fieldname": "vdot",
+   "fieldtype": "Float",
+   "label": "VDOT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "trimp",
+   "fieldtype": "Float",
+   "label": "TRIMP",
+   "read_only": 1
   },
   {
    "fieldname": "notes",
