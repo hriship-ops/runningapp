@@ -33,13 +33,12 @@ GEOCODE_TIME_BUDGET_SEC = 60
 
 
 def _pending_geo_count():
-    # NOTE: frappe.get_all's ["in", ["", None]] filter never matches NULL —
-    # SQL's IN() uses = comparisons, and NULL = NULL is UNKNOWN, not TRUE.
-    # Every pre-existing run has country IS NULL (not ''), so that filter
-    # silently matched almost nothing. Raw SQL with an explicit IS NULL.
+    # Only genuinely un-attempted rows (country IS NULL). A row that was
+    # attempted but had no usable point data gets country set to '' (not
+    # left NULL) specifically so it's not picked up again forever.
     return frappe.db.sql(
         """SELECT COUNT(*) FROM `tabRun`
-           WHERE (country IS NULL OR country = '')
+           WHERE country IS NULL
              AND route_points IS NOT NULL AND route_points != ''""",
     )[0][0]
 
@@ -52,7 +51,7 @@ def backfill_geo_fields():
 
     runs = frappe.db.sql(
         """SELECT name, route_points FROM `tabRun`
-           WHERE (country IS NULL OR country = '')
+           WHERE country IS NULL
              AND route_points IS NOT NULL AND route_points != ''
            LIMIT %s""",
         (GEOCODE_BACKFILL_MAX * 3,),
@@ -62,22 +61,29 @@ def backfill_geo_fields():
     for run in runs:
         if updated >= GEOCODE_BACKFILL_MAX or (time.monotonic() - t_start) > GEOCODE_TIME_BUDGET_SEC:
             break
+
+        details = {"country": "", "state": "", "district": ""}
         try:
             points = json.loads(run.route_points)
+            lat = points[0]["lat"]
+            lon = points[0]["lon"]
         except Exception:
-            continue
-        if not points:
-            continue
+            # Malformed/unexpected route_points shape — mark with the ''
+            # sentinel (not NULL) so this row is skipped on future calls
+            # instead of being re-selected and re-failing forever.
+            points = None
 
-        details = get_location_details(points[0]["lat"], points[0]["lon"])
+        if points is not None:
+            details = get_location_details(lat, lon)
+            time.sleep(1)  # Nominatim usage policy: max 1 req/sec
+
         frappe.db.set_value(
             "Run", run.name,
-            {"country": details["country"], "state": details["state"], "district": details["district"]},
+            {"country": details["country"] or "", "state": details["state"], "district": details["district"]},
             update_modified=False,
         )
         updated += 1
         frappe.db.commit()
-        time.sleep(1)
 
     remaining = _pending_geo_count()
     return {"updated": updated, "more_pending": remaining > 0, "remaining": remaining}
