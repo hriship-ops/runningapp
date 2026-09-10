@@ -28,6 +28,7 @@
   "route_points",
   "strava_id",
   "garmin_id",
+  "route_points_reflowed",
   "gear",
   "weather_condition",
   "weather_temp",
@@ -158,6 +159,13 @@
    "fieldname": "garmin_id",
    "fieldtype": "Data",
    "label": "Garmin ID",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "route_points_reflowed",
+   "fieldtype": "Check",
+   "label": "Route Points Reflowed",
    "read_only": 1
   },
   {

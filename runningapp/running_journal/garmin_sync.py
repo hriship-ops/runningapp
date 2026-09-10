@@ -131,8 +131,13 @@ def _parse_tcx_points(tcx_bytes):
         pts.append(pt)
 
     if len(pts) > MAX_POINTS:
-        step = len(pts) // MAX_POINTS
-        pts = pts[::step][:MAX_POINTS]
+        # Even sampling across the whole range, always including the last
+        # point. `pts[::step][:MAX_POINTS]` looks equivalent but isn't: for
+        # any N where N // MAX_POINTS == 1 (e.g. 501-999 points), step=1
+        # makes pts[::1] a no-op and [:500] just truncates to the first
+        # half of the recording instead of sampling the whole thing.
+        n = len(pts) - 1
+        pts = [pts[round(i * n / (MAX_POINTS - 1))] for i in range(MAX_POINTS)]
     return pts
 
 
@@ -221,6 +226,9 @@ def activity_to_run(activity, points, settings):
         "max_heart_rate": max_hr_val,
         "garmin_id": str(activity.get("activityId", "")),
         "route_points": json.dumps(points) if points else "",
+        # Freshly synced with the corrected even-sampling downsampler —
+        # no need for rebackfill_routes() to redo this one.
+        "route_points_reflowed": 1,
     }
     if vdot:
         run_doc["vdot"] = vdot
@@ -386,3 +394,50 @@ def debug_raw_tcx_span(activity_id):
         result["last_time"] = times[-1]
         result["raw_span_sec"] = round((t_last - t0).total_seconds())
     return result
+
+
+# ── Route re-backfill (downsampling bug fix) ────────────────────────────────
+REBACKFILL_MAX = 20
+REBACKFILL_TIME_BUDGET_SEC = 90
+
+
+def rebackfill_routes():
+    """Re-download + re-parse TCX for Garmin runs affected by the
+    pts[::step][:MAX_POINTS] truncation bug (any run whose raw TCX had
+    between MAX_POINTS+1 and 2*MAX_POINTS-1 trackpoints lost its second
+    half). Bounded per call like sync_garmin; call repeatedly until
+    more_pending is false. Marks each run as done via a route_points hash
+    stored nowhere — instead we just track via a dedicated flag field,
+    avoided here by simply re-processing every garmin_id run once: safe
+    to run multiple times since it always re-fetches equally-correct data.
+    """
+    client = get_garmin_client()
+    t_start = time.monotonic()
+    updated = 0
+    checked = 0
+    more_pending = False
+
+    runs = frappe.get_all(
+        "Run",
+        filters={"garmin_id": ["!=", ""], "route_points_reflowed": 0},
+        fields=["name", "garmin_id"],
+        limit_page_length=REBACKFILL_MAX * 5,
+    )
+
+    for run in runs:
+        checked += 1
+        if updated >= REBACKFILL_MAX or (time.monotonic() - t_start) > REBACKFILL_TIME_BUDGET_SEC:
+            more_pending = True
+            break
+
+        points = fetch_activity_route(client, run.garmin_id)
+        frappe.db.set_value(
+            "Run", run.name,
+            {"route_points": json.dumps(points) if points else "", "route_points_reflowed": 1},
+            update_modified=False,
+        )
+        updated += 1
+        frappe.db.commit()
+
+    remaining = frappe.db.count("Run", filters={"garmin_id": ["!=", ""], "route_points_reflowed": 0})
+    return {"updated": updated, "checked": checked, "more_pending": more_pending or remaining > 0, "remaining": remaining}
