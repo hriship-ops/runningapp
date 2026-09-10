@@ -192,7 +192,12 @@ def activity_to_run(activity, points, settings):
                 max_hr_val = max(hr_vals)
 
     location = ""
-    geo = {"country": "", "state": "", "district": ""}
+    # None (not "" defaults) so a transient geocode failure — vs. genuinely
+    # no GPS points, or Nominatim successfully returning no country for a
+    # real point — leaves country/state/district NULL on insert instead of
+    # permanently marking this run as having no location data. NULL rows
+    # get picked up and retried by location_summary.backfill_geo_fields().
+    geo = None
     if points:
         try:
             details = get_location_details(points[0]["lat"], points[0]["lon"])
@@ -223,9 +228,6 @@ def activity_to_run(activity, points, settings):
         "date": start_date,
         "activity_type": activity_type,
         "location": location,
-        "country": geo["country"],
-        "state": geo["state"],
-        "district": geo["district"],
         "distance_km": distance_km,
         "duration_sec": duration_sec,
         "elevation_gain": elev_gain,
@@ -243,6 +245,13 @@ def activity_to_run(activity, points, settings):
         run_doc["vdot"] = vdot
     if trimp:
         run_doc["trimp"] = trimp
+    # Left out entirely (not set to "") on a failed geocode, so the field
+    # stays NULL and location_summary.backfill_geo_fields() retries it
+    # later instead of this run being permanently marked as unknown.
+    if geo is not None:
+        run_doc["country"] = geo["country"]
+        run_doc["state"] = geo["state"]
+        run_doc["district"] = geo["district"]
     return run_doc
 
 

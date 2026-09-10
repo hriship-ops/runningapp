@@ -304,7 +304,11 @@ def activity_to_run(activity, detail, streams, settings):
 
     # Location
     location = ""
-    geo = {"country": "", "state": "", "district": ""}
+    # None (not "" defaults) so a transient geocode failure leaves
+    # country/state/district NULL on insert — picked up and retried by
+    # location_summary.backfill_geo_fields() — instead of permanently
+    # marking this run as having no location data.
+    geo = None
     start_latlng = activity.get("start_latlng", [])
     if start_latlng and len(start_latlng) == 2:
         try:
@@ -346,9 +350,6 @@ def activity_to_run(activity, detail, streams, settings):
         "date":               start_date,
         "activity_type":      activity_type,
         "location":           location,
-        "country":            geo["country"],
-        "state":              geo["state"],
-        "district":           geo["district"],
         "distance_km":        distance_km,
         "duration_sec":       duration_sec,
         "elevation_gain":     elev_gain,
@@ -367,6 +368,13 @@ def activity_to_run(activity, detail, streams, settings):
     if gear_name:    run_doc["gear"]  = gear_name
     if vdot:         run_doc["vdot"]  = vdot
     if trimp:        run_doc["trimp"] = trimp
+    # Left out entirely (not set to "") on a failed geocode, so the field
+    # stays NULL and location_summary.backfill_geo_fields() retries it
+    # later instead of this run being permanently marked as unknown.
+    if geo is not None:
+        run_doc["country"] = geo["country"]
+        run_doc["state"] = geo["state"]
+        run_doc["district"] = geo["district"]
 
     return run_doc
 
