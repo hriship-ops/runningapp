@@ -41,8 +41,6 @@
           <div class="rw-geo-lbl">Districts</div>
         </div>
       </div>
-      <div class="rw-geo-text" id="rw-geo-text"></div>
-      <button class="rw-btn-import" id="rw-geo-refresh-btn" onclick="rwRefreshGeoSummary()" style="display:none">&#8635; Refresh Summary</button>
     </div>
 
     <!-- GEO DRILL-DOWN MODAL -->
@@ -192,7 +190,6 @@
         var user = data.message;
         if (user && user !== 'Guest') {
           document.getElementById('rw-sync-btn').style.display = '';
-          document.getElementById('rw-geo-refresh-btn').style.display = '';
           document.getElementById('rw-login-btn').style.display = 'none';
           document.getElementById('rw-logout-btn').style.display = '';
         }

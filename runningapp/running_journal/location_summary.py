@@ -1,29 +1,19 @@
 """
 location_summary.py
 --------------------
-Country/state/district breakdown of everywhere the athlete has run, for a
-dashboard card. Geocoding itself is NOT the LLM's job — country/state/
-district come from Nominatim's own structured address fields (accurate,
-free) via strava_sync.get_location_details(). The LLM (Anthropic or
-OpenRouter, whichever Run Settings is configured for) only turns the
-deduplicated list into a short, readable summary sentence.
+Country/state/district breakdown of everywhere the athlete has run, for the
+dashboard's drill-down cards. Country/state/district come from Nominatim's
+own structured address fields via strava_sync.get_location_details().
 """
 
 import json
 import time
 
 import frappe
-import requests
-from frappe.utils.password import get_decrypted_password
 
 from runningapp.running_journal.strava_sync import get_location_details, first_latlon
 
 SETTINGS = "Run Settings"
-
-DEFAULT_MODELS = {
-    "Anthropic": "claude-sonnet-4-5-20250929",
-    "OpenRouter": "anthropic/claude-sonnet-4.5",
-}
 
 # Nominatim's usage policy caps free reverse-geocoding at ~1 request/sec,
 # so this backfill is bounded and paced, and must be called repeatedly
@@ -115,80 +105,12 @@ def _distinct_geo():
     return countries, states, districts
 
 
-def _call_llm(prompt):
-    provider = frappe.db.get_single_value(SETTINGS, "llm_provider") or "Anthropic"
-    api_key = get_decrypted_password(SETTINGS, SETTINGS, "llm_api_key", raise_exception=False)
-    model = frappe.db.get_single_value(SETTINGS, "llm_model") or DEFAULT_MODELS.get(provider, DEFAULT_MODELS["Anthropic"])
-
-    if not api_key:
-        frappe.throw("No LLM API key configured in Run Settings")
-
-    if provider == "OpenRouter":
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
-    else:  # Anthropic
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
-            json={"model": model, "max_tokens": 300, "messages": [{"role": "user", "content": prompt}]},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json()["content"][0]["text"].strip()
-
-
-@frappe.whitelist()
-def refresh_location_summary():
-    """Calls the LLM — costs money, so this is login-required (default for
-    @frappe.whitelist() without allow_guest=True), triggered only by the
-    dashboard's explicit refresh button, never automatically."""
-    countries, states, districts = _distinct_geo()
-    if not countries:
-        text = "No location data yet — sync some runs first."
-    else:
-        prompt = (
-            "Here is everywhere I've gone running, as geocoded place names:\n"
-            f"Countries: {', '.join(countries)}\n"
-            f"States/regions: {', '.join(states)}\n"
-            f"Districts/counties: {', '.join(districts)}\n\n"
-            "Write one short, friendly sentence (under 240 characters, no "
-            "markdown) for a personal running dashboard card. Mention the "
-            f"counts ({len(countries)} countries, {len(states)} states, "
-            f"{len(districts)} districts) and name the countries/states."
-        )
-        text = _call_llm(prompt)
-
-    frappe.db.set_single_value(SETTINGS, "location_summary_text", text)
-    frappe.db.set_single_value(SETTINGS, "location_summary_updated", frappe.utils.now())
-    frappe.db.commit()
-    return {
-        "summary": text,
-        "countries": countries,
-        "states": states,
-        "districts": districts,
-    }
-
-
 @frappe.whitelist(allow_guest=True)
 def get_location_summary():
-    """Cached read only — no LLM call, safe for the public dashboard load.
-    Includes the actual lists (not just counts) for the drill-down cards."""
-    text = frappe.db.get_single_value(SETTINGS, "location_summary_text") or ""
-    updated = frappe.db.get_single_value(SETTINGS, "location_summary_updated")
+    """Countries/states/districts run in, with the actual lists for the
+    dashboard's drill-down cards."""
     countries, states, districts = _distinct_geo()
     return {
-        "summary": text,
-        "updated": str(updated) if updated else None,
         "countries": countries,
         "states": states,
         "districts": districts,

@@ -19,7 +19,6 @@ body { margin:0; background:#111827; }
 .rw-geo-card:hover { background:#1a2333; }
 .rw-geo-val { font-size:22px; font-weight:700; color:#60a5fa; letter-spacing:-0.3px; }
 .rw-geo-lbl { font-size:10px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
-.rw-geo-text { font-size:12px; color:#9ca3af; margin-bottom:8px; }
 .rw-geo-list { list-style:none; margin:0; padding:0; max-height:320px; overflow-y:auto; }
 .rw-geo-list li { padding:8px 0; border-bottom:1px solid #374151; font-size:13px; color:#e5e7eb; cursor:pointer; }
 .rw-geo-list li:hover { color:#93c5fd; }
