@@ -11,7 +11,7 @@ def get_all_runs(filters=None):
     return frappe.db.get_all(
         "Run",
         filters=filters or [],
-        fields=["name","run_name","date","activity_type","location","distance_km","duration_sec","elevation_gain","calories","avg_heart_rate","max_heart_rate"],
+        fields=["name","run_name","date","activity_type","location","country","state","district","distance_km","duration_sec","elevation_gain","calories","avg_heart_rate","max_heart_rate"],
         order_by="date desc",
         ignore_permissions=True
     )

@@ -43,13 +43,17 @@ function rwRenderGeoSummary(data) {
     if (text) text.textContent = data.summary || '';
 }
 
+var RW_GEO_FIELD = { countries: 'country', states: 'state', districts: 'district' };
+
 function rwOpenGeoModal(kind) {
     var titles = { countries: 'Countries', states: 'States', districts: 'Districts' };
     var list = rwGeoData[kind] || [];
     document.getElementById('rw-geo-modal-title').textContent = titles[kind] || kind;
     var ul = document.getElementById('rw-geo-modal-list');
     ul.innerHTML = list.length
-        ? list.map(function(name) { return '<li>' + name + '</li>'; }).join('')
+        ? list.map(function(name) {
+            return '<li onclick="rwShowRunsForGeo(\'' + kind + '\', ' + JSON.stringify(name) + ')">' + name + '</li>';
+          }).join('')
         : '<li style="color:#6b7280">No data yet — sync some runs first.</li>';
     document.getElementById('rw-geo-modal').style.display = 'flex';
 }
@@ -57,6 +61,21 @@ function rwOpenGeoModal(kind) {
 function rwCloseGeoModal(e) {
     if (!e || e.target === document.getElementById('rw-geo-modal'))
         document.getElementById('rw-geo-modal').style.display = 'none';
+}
+
+function rwShowRunsForGeo(kind, name) {
+    var field = RW_GEO_FIELD[kind] || 'country';
+    var runs = rwAllRuns.filter(function(r) { return r[field] === name; });
+    var rows = runs.map(function(r) {
+        return '<tr onclick="rwOpenDetail(\'' + r.name + '\')">' +
+            '<td>' + fmtDate(r.date) + '</td><td>' + actPill(r.activity_type) + '</td>' +
+            '<td>' + (r.location||'--') + '</td><td>' + fmtDist(r.distance_km||0) + '</td>' +
+            '<td>' + fmtDur(r.duration_sec||0) + '</td><td>' + fmtPace(r.distance_km,r.duration_sec) + '</td></tr>';
+    }).join('');
+    document.getElementById('rw-modal-rows').innerHTML = rows;
+    document.getElementById('rw-modal-title').textContent = name + ' · ' + runs.length + ' activities';
+    document.getElementById('rw-geo-modal').style.display = 'none';
+    document.getElementById('rw-modal').style.display = 'flex';
 }
 
 function rwLoadGeoSummary() {
