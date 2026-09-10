@@ -175,7 +175,12 @@ function fmtDur(sec) {
 }
 function fmtPace(km, sec) {
     if (!sec || !km) return '--';
-    var sPerKm = sec / km, m = Math.floor(sPerKm/60), s = Math.round(sPerKm%60);
+    // Round the whole pace to the nearest second first, then split into
+    // minutes/seconds — rounding seconds independently of the floor'd
+    // minutes let 59.6s round up to "60" without carrying into the next
+    // minute, showing paces like "6:60/km" instead of "7:00/km".
+    var total = Math.round(sec / km);
+    var m = Math.floor(total / 60), s = total % 60;
     return m + ':' + String(s).padStart(2,'0') + '/km';
 }
 function fmtDate(d) {
@@ -272,12 +277,12 @@ function rwRenderLabel() {
         var months = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
         parts.push(months[parseInt(rwState.month)]);
     }
-    var label = parts.length ? parts.join(' Â· ') : 'All Time';
+    var label = parts.length ? parts.join(' · ') : 'All Time';
     var count = rwState.runs.length;
     var singular = rwFocusActivity ? rwFocusActivity.toLowerCase() : 'activity';
     var plural = rwFocusActivity ? rwFocusActivity.toLowerCase() + 's' : 'activities';
     var el = document.getElementById('rw-section-label');
-    if (el) el.textContent = label + ' Â· ' + count + ' ' + (count === 1 ? singular : plural);
+    if (el) el.textContent = label + ' · ' + count + ' ' + (count === 1 ? singular : plural);
 }
 
 /* â”€â”€ STAT CARDS â”€â”€ */
@@ -312,7 +317,7 @@ function rwRenderStats(runs) {
     var el = document.getElementById('rw-cards');
     if (el) el.innerHTML = html;
     var sub = document.getElementById('rw-total-sub');
-    if (sub) sub.textContent = runs.length + ' ' + (runs.length === 1 ? singular : plural) + ' Â· ' + fmtDist(totalDist);
+    if (sub) sub.textContent = runs.length + ' ' + (runs.length === 1 ? singular : plural) + ' · ' + fmtDist(totalDist);
 }
 
 /* â”€â”€ AGGREGATOR HELPERS â”€â”€ */
@@ -389,7 +394,7 @@ function rwBestWeek(runs) {
     if (!best) return null;
     var endD = new Date(best+'T12:00:00'); endD.setDate(endD.getDate()+6);
     var endDate = endD.toISOString().slice(0,10);
-    var label = new Date(best+'T12:00:00').toLocaleDateString('en-US',{day:'numeric',month:'short'}) + ' â€“ ' + endD.toLocaleDateString('en-US',{day:'numeric',month:'short'});
+    var label = new Date(best+'T12:00:00').toLocaleDateString('en-US',{day:'numeric',month:'short'}) + ' – ' + endD.toLocaleDateString('en-US',{day:'numeric',month:'short'});
     return { dist:bestDist, count:weeks[best].count, label:label, startDate:best, endDate:endDate };
 }
 function rwMostRunsWeek(runs) {
@@ -407,7 +412,7 @@ function rwMostRunsWeek(runs) {
     if (!best) return null;
     var endD = new Date(best+'T12:00:00'); endD.setDate(endD.getDate()+6);
     var endDate = endD.toISOString().slice(0,10);
-    var label = new Date(best+'T12:00:00').toLocaleDateString('en-US',{day:'numeric',month:'short'}) + ' â€“ ' + endD.toLocaleDateString('en-US',{day:'numeric',month:'short'});
+    var label = new Date(best+'T12:00:00').toLocaleDateString('en-US',{day:'numeric',month:'short'}) + ' – ' + endD.toLocaleDateString('en-US',{day:'numeric',month:'short'});
     return { count:bestCount, dist:weeks[best].dist, label:label, startDate:best, endDate:endDate };
 }
 function rwBestEffort(runs, field, minSec) {
@@ -467,23 +472,23 @@ function rwRenderRecords(runs) {
 
     function raceCard(label, run) {
         if (!run) return makeCard('--', label, '&nbsp;', false, null);
-        var sub = fmtDur(run.duration_sec) + ' Â· ' + fmtDate(run.date);
+        var sub = fmtDur(run.duration_sec) + ' · ' + fmtDate(run.date);
         return makeCard(fmtPace(run.distance_km, run.duration_sec), label, sub, true, 'rwOpenDetail(\'' + run.name + '\')');
     }
 
     var html = '';
-    html += makeCard(bMonth ? fmtMonthKey(bMonth.key) : '--', 'Best month', bMonth ? fmtDist(bMonth.dist) + ' Â· ' + bMonth.count + ' ' + (bMonth.count === 1 ? act : acts) : '&nbsp;', true, bMonth ? 'rwShowMonthModal(\'' + bMonth.key + '\')' : '');
-    html += makeCard(wMonth ? fmtMonthKey(wMonth.key) : '--', 'Worst month', wMonth ? fmtDist(wMonth.dist) + ' Â· ' + wMonth.count + ' ' + (wMonth.count === 1 ? act : acts) : '&nbsp;', true, wMonth ? 'rwShowMonthModal(\'' + wMonth.key + '\')' : '');
-    html += makeCard(bYear ? bYear.key : '--', 'Best year', bYear ? fmtDist(bYear.dist) + ' Â· ' + bYear.count + ' ' + (bYear.count === 1 ? act : acts) : '&nbsp;', false, null);
+    html += makeCard(bMonth ? fmtMonthKey(bMonth.key) : '--', 'Best month', bMonth ? fmtDist(bMonth.dist) + ' · ' + bMonth.count + ' ' + (bMonth.count === 1 ? act : acts) : '&nbsp;', true, bMonth ? 'rwShowMonthModal(\'' + bMonth.key + '\')' : '');
+    html += makeCard(wMonth ? fmtMonthKey(wMonth.key) : '--', 'Worst month', wMonth ? fmtDist(wMonth.dist) + ' · ' + wMonth.count + ' ' + (wMonth.count === 1 ? act : acts) : '&nbsp;', true, wMonth ? 'rwShowMonthModal(\'' + wMonth.key + '\')' : '');
+    html += makeCard(bYear ? bYear.key : '--', 'Best year', bYear ? fmtDist(bYear.dist) + ' · ' + bYear.count + ' ' + (bYear.count === 1 ? act : acts) : '&nbsp;', false, null);
     html += raceCard('Fastest 5k', f5k);
     html += raceCard('Fastest 10k', f10k);
     html += raceCard('Fastest HM', fHM);
     html += raceCard('Fastest FM', fFM);
-    html += makeCard(streak ? streak.days + ' days' : '--', 'Longest streak', streak ? fmtDateShort(streak.start) + ' â€“ ' + fmtDateShort(streak.end) : '&nbsp;', !!streak, streak ? 'rwShowRangeModal(\'' + streak.start + '\',\'' + streak.end + '\',\'Longest Streak\')' : '');
-    html += makeCard(bestWeek ? fmtDist(bestWeek.dist) : '--', 'Best week (km)', bestWeek ? bestWeek.label + ' Â· ' + bestWeek.count + ' runs' : '&nbsp;', !!bestWeek, bestWeek ? 'rwShowRangeModal(\'' + bestWeek.startDate + '\',\'' + bestWeek.endDate + '\',\'Best Week\')' : '');
+    html += makeCard(streak ? streak.days + ' days' : '--', 'Longest streak', streak ? fmtDateShort(streak.start) + ' – ' + fmtDateShort(streak.end) : '&nbsp;', !!streak, streak ? 'rwShowRangeModal(\'' + streak.start + '\',\'' + streak.end + '\',\'Longest Streak\')' : '');
+    html += makeCard(bestWeek ? fmtDist(bestWeek.dist) : '--', 'Best week (km)', bestWeek ? bestWeek.label + ' · ' + bestWeek.count + ' runs' : '&nbsp;', !!bestWeek, bestWeek ? 'rwShowRangeModal(\'' + bestWeek.startDate + '\',\'' + bestWeek.endDate + '\',\'Best Week\')' : '');
     html += makeCard(mostRunsWeek ? mostRunsWeek.count + ' runs' : '--', 'Most runs / week', mostRunsWeek ? mostRunsWeek.label : '&nbsp;', !!mostRunsWeek, mostRunsWeek ? 'rwShowRangeModal(\'' + mostRunsWeek.startDate + '\',\'' + mostRunsWeek.endDate + '\',\'Most Runs Week\')' : '');
-    html += makeCard(bestPaceRun ? fmtPace(bestPaceRun.distance_km, bestPaceRun.duration_sec) : '--', 'Best pace run', bestPaceRun ? fmtDist(bestPaceRun.distance_km) + ' Â· ' + fmtDate(bestPaceRun.date) : 'min 5k', true, bestPaceRun ? 'rwOpenDetail(\'' + bestPaceRun.name + '\')' : '');
-    html += makeCard(lowestHRRun ? Math.round(lowestHRRun.avg_heart_rate) + ' bpm' : '--', 'Lowest HR run', lowestHRRun ? fmtDist(lowestHRRun.distance_km) + ' Â· ' + fmtDate(lowestHRRun.date) : 'min 10k', true, lowestHRRun ? 'rwOpenDetail(\'' + lowestHRRun.name + '\')' : '');
+    html += makeCard(bestPaceRun ? fmtPace(bestPaceRun.distance_km, bestPaceRun.duration_sec) : '--', 'Best pace run', bestPaceRun ? fmtDist(bestPaceRun.distance_km) + ' · ' + fmtDate(bestPaceRun.date) : 'min 5k', true, bestPaceRun ? 'rwOpenDetail(\'' + bestPaceRun.name + '\')' : '');
+    html += makeCard(lowestHRRun ? Math.round(lowestHRRun.avg_heart_rate) + ' bpm' : '--', 'Lowest HR run', lowestHRRun ? fmtDist(lowestHRRun.distance_km) + ' · ' + fmtDate(lowestHRRun.date) : 'min 10k', true, lowestHRRun ? 'rwOpenDetail(\'' + lowestHRRun.name + '\')' : '');
 
     // Best efforts from pre-computed segment fields
     var e1k   = rwBestEffort(onlyRuns, "best_1k_sec",   210);
@@ -555,7 +560,7 @@ function rwRenderWeeklyTable(runs) {
         var avgHR = w.hrCount ? Math.round(w.hrSum/w.hrCount) + ' bpm' : '--';
         var barW = Math.round((w.dist/maxDist)*60);
         var distCell = w.dist > 0 ? '<div class="rw-bar-cell"><div class="rw-bar" style="width:' + barW + 'px"></div>' + fmtDist(w.dist) + '</div>' : '--';
-        html += '<tr><td>' + fmt(w.start) + ' â€“ ' + fmt(w.end) + '</td><td>' + (w.runs.length||'--') + '</td><td>' + distCell + '</td><td>' + fmtPace(w.dist,w.sec) + '</td><td>' + avgHR + '</td><td>' + (w.elev ? Math.round(w.elev)+' m' : '--') + '</td></tr>';
+        html += '<tr><td>' + fmt(w.start) + ' – ' + fmt(w.end) + '</td><td>' + (w.runs.length||'--') + '</td><td>' + distCell + '</td><td>' + fmtPace(w.dist,w.sec) + '</td><td>' + avgHR + '</td><td>' + (w.elev ? Math.round(w.elev)+' m' : '--') + '</td></tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
@@ -634,7 +639,7 @@ function rwShowMonthModal(monthKey) {
             '<td>' + fmtDur(r.duration_sec||0) + '</td><td>' + fmtPace(r.distance_km,r.duration_sec) + '</td></tr>';
     }).join('');
     document.getElementById('rw-modal-rows').innerHTML = rows;
-    document.getElementById('rw-modal-title').textContent = fmtMonthKey(monthKey) + ' Â· ' + runs.length + ' activities';
+    document.getElementById('rw-modal-title').textContent = fmtMonthKey(monthKey) + ' · ' + runs.length + ' activities';
     document.getElementById('rw-modal').style.display = 'flex';
 }
 
@@ -661,7 +666,7 @@ function rwShowRangeModal(startDate, endDate, title) {
             '<td>' + fmtDur(r.duration_sec||0) + '</td><td>' + fmtPace(r.distance_km,r.duration_sec) + '</td></tr>';
     }).join('');
     document.getElementById('rw-modal-rows').innerHTML = rows;
-    document.getElementById('rw-modal-title').textContent = title + ' Â· ' + runs.length + ' activities';
+    document.getElementById('rw-modal-title').textContent = title + ' · ' + runs.length + ' activities';
     document.getElementById('rw-modal').style.display = 'flex';
 }
 
@@ -684,9 +689,9 @@ function rwRenderTicker() {
     var html = items.map(function(r) {
         var emoji = r.activity_type === 'Swimming' ? 'ðŸ„' : r.activity_type === 'Cycling' ? 'ðŸš´' : r.activity_type === 'Walk' ? 'ðŸš¶' : 'ðŸƒ';
         return '<div class="rw-ticker-item" onclick="rwOpenDetail(\'' + r.name + '\')">' +
-            emoji + ' ' + fmtDate(r.date) + ' Â· ' + (r.location||'') +
-            ' Â· ' + fmtDist(r.distance_km||0) +
-            (r.duration_sec ? ' Â· ' + fmtPace(r.distance_km, r.duration_sec) : '') + '</div>';
+            emoji + ' ' + fmtDate(r.date) + ' · ' + (r.location||'') +
+            ' · ' + fmtDist(r.distance_km||0) +
+            (r.duration_sec ? ' · ' + fmtPace(r.distance_km, r.duration_sec) : '') + '</div>';
     }).join('');
     document.getElementById('rw-ticker').innerHTML = html;
     document.getElementById('rw-ticker-page').textContent = (page+1) + '/' + Math.max(1,totalPages);
