@@ -44,18 +44,53 @@ function rwRenderGeoSummary(data) {
 }
 
 var RW_GEO_FIELD = { countries: 'country', states: 'state', districts: 'district' };
+var RW_GEO_NEXT = { country: 'state', state: 'district', district: null };
+var RW_GEO_TITLES = { country: 'Countries', state: 'States', district: 'Districts' };
+var rwGeoFilters = {};
+
+/* Distinct values for `field` among runs matching `filters`, computed
+   client-side from the already-loaded rwAllRuns — no extra API calls
+   needed for any level of the drill-down. */
+function rwGeoDistinct(field, filters) {
+    var seen = {};
+    var out = [];
+    rwAllRuns.forEach(function(r) {
+        var val = r[field];
+        if (!val) return;
+        for (var k in filters) { if (r[k] !== filters[k]) return; }
+        if (!seen[val]) { seen[val] = true; out.push(val); }
+    });
+    return out.sort();
+}
+
+function rwEsc(s) { return String(s).replace(/'/g, "\\'"); }
 
 function rwOpenGeoModal(kind) {
-    var titles = { countries: 'Countries', states: 'States', districts: 'Districts' };
-    var list = rwGeoData[kind] || [];
-    document.getElementById('rw-geo-modal-title').textContent = titles[kind] || kind;
+    rwGeoFilters = {};
+    rwGeoRenderLevel(RW_GEO_FIELD[kind]);
+}
+
+function rwGeoRenderLevel(field) {
+    var list = rwGeoDistinct(field, rwGeoFilters);
+    var crumbs = Object.keys(rwGeoFilters).map(function(k) { return rwGeoFilters[k]; }).join(' › ');
+    document.getElementById('rw-geo-modal-title').textContent = (crumbs ? crumbs + ' › ' : '') + (RW_GEO_TITLES[field] || field);
     var ul = document.getElementById('rw-geo-modal-list');
     ul.innerHTML = list.length
         ? list.map(function(name) {
-            return '<li onclick="rwShowRunsForGeo(\'' + kind + '\', ' + JSON.stringify(name) + ')">' + name + '</li>';
+            return '<li onclick="rwGeoDrill(\'' + field + '\', \'' + rwEsc(name) + '\')">' + name + '</li>';
           }).join('')
-        : '<li style="color:#6b7280">No data yet — sync some runs first.</li>';
+        : '<li style="color:#6b7280">No runs here yet.</li>';
     document.getElementById('rw-geo-modal').style.display = 'flex';
+}
+
+function rwGeoDrill(field, value) {
+    rwGeoFilters[field] = value;
+    var next = RW_GEO_NEXT[field];
+    if (next) {
+        rwGeoRenderLevel(next);
+    } else {
+        rwShowRunsForGeoFilters(value);
+    }
 }
 
 function rwCloseGeoModal(e) {
@@ -63,9 +98,12 @@ function rwCloseGeoModal(e) {
         document.getElementById('rw-geo-modal').style.display = 'none';
 }
 
-function rwShowRunsForGeo(kind, name) {
-    var field = RW_GEO_FIELD[kind] || 'country';
-    var runs = rwAllRuns.filter(function(r) { return r[field] === name; });
+function rwShowRunsForGeoFilters(label) {
+    var filters = rwGeoFilters;
+    var runs = rwAllRuns.filter(function(r) {
+        for (var k in filters) { if (r[k] !== filters[k]) return false; }
+        return true;
+    });
     var rows = runs.map(function(r) {
         return '<tr onclick="rwOpenDetail(\'' + r.name + '\')">' +
             '<td>' + fmtDate(r.date) + '</td><td>' + actPill(r.activity_type) + '</td>' +
@@ -73,7 +111,7 @@ function rwShowRunsForGeo(kind, name) {
             '<td>' + fmtDur(r.duration_sec||0) + '</td><td>' + fmtPace(r.distance_km,r.duration_sec) + '</td></tr>';
     }).join('');
     document.getElementById('rw-modal-rows').innerHTML = rows;
-    document.getElementById('rw-modal-title').textContent = name + ' · ' + runs.length + ' activities';
+    document.getElementById('rw-modal-title').textContent = label + ' · ' + runs.length + ' activities';
     document.getElementById('rw-geo-modal').style.display = 'none';
     document.getElementById('rw-modal').style.display = 'flex';
 }
