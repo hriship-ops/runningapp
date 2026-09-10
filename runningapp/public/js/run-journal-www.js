@@ -47,7 +47,20 @@ var RW_GEO_FIELD = { countries: 'country', states: 'state', districts: 'district
 var RW_GEO_NEXT = { country: 'state', state: 'district', district: null };
 var RW_GEO_TITLES = { country: 'Countries', state: 'States', district: 'Districts' };
 var RW_GEO_EMPTY = '(Unspecified)';
+/* No-country runs have no GPS at all (pool swims, gym, treadmill) — a
+   different situation from "has a state but Nominatim returned no
+   county/district for that point", so they get a more specific label
+   at the top level than the generic fallback used deeper in. */
+var RW_GEO_EMPTY_LABEL = {
+    country: 'Pool Swims / Gym / Treadmill',
+    state: RW_GEO_EMPTY,
+    district: RW_GEO_EMPTY,
+};
 var rwGeoFilters = {};
+
+function rwGeoDisplayLabel(field, value) {
+    return value === RW_GEO_EMPTY ? (RW_GEO_EMPTY_LABEL[field] || RW_GEO_EMPTY) : value;
+}
 
 /* A run matches filters[k] if its own field value equals filters[k], with
    RW_GEO_EMPTY treated as "this field is blank" — not all reverse-geocode
@@ -91,12 +104,12 @@ function rwOpenGeoModal(kind) {
 
 function rwGeoRenderLevel(field) {
     var list = rwGeoDistinct(field, rwGeoFilters);
-    var crumbs = Object.keys(rwGeoFilters).map(function(k) { return rwGeoFilters[k]; }).join(' › ');
+    var crumbs = Object.keys(rwGeoFilters).map(function(k) { return rwGeoDisplayLabel(k, rwGeoFilters[k]); }).join(' › ');
     document.getElementById('rw-geo-modal-title').textContent = (crumbs ? crumbs + ' › ' : '') + (RW_GEO_TITLES[field] || field);
     var ul = document.getElementById('rw-geo-modal-list');
     ul.innerHTML = list.length
         ? list.map(function(name) {
-            return '<li onclick="rwGeoDrill(\'' + field + '\', \'' + rwEsc(name) + '\')">' + name + '</li>';
+            return '<li onclick="rwGeoDrill(\'' + field + '\', \'' + rwEsc(name) + '\')">' + rwGeoDisplayLabel(field, name) + '</li>';
           }).join('')
         : '<li style="color:#6b7280">No runs here yet.</li>';
     document.getElementById('rw-geo-modal').style.display = 'flex';
@@ -108,7 +121,7 @@ function rwGeoDrill(field, value) {
     if (next) {
         rwGeoRenderLevel(next);
     } else {
-        rwShowRunsForGeoFilters(value);
+        rwShowRunsForGeoFilters(rwGeoDisplayLabel(field, value));
     }
 }
 
