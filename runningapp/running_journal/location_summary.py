@@ -32,17 +32,31 @@ GEOCODE_BACKFILL_MAX = 40
 GEOCODE_TIME_BUDGET_SEC = 60
 
 
+def _pending_geo_count():
+    # NOTE: frappe.get_all's ["in", ["", None]] filter never matches NULL —
+    # SQL's IN() uses = comparisons, and NULL = NULL is UNKNOWN, not TRUE.
+    # Every pre-existing run has country IS NULL (not ''), so that filter
+    # silently matched almost nothing. Raw SQL with an explicit IS NULL.
+    return frappe.db.sql(
+        """SELECT COUNT(*) FROM `tabRun`
+           WHERE (country IS NULL OR country = '')
+             AND route_points IS NOT NULL AND route_points != ''""",
+    )[0][0]
+
+
 def backfill_geo_fields():
     """One-off: populate country/state/district on runs that predate this
     feature, using each run's first route point."""
     t_start = time.monotonic()
     updated = 0
 
-    runs = frappe.get_all(
-        "Run",
-        filters={"country": ["in", ["", None]], "route_points": ["!=", ""]},
-        fields=["name", "route_points"],
-        limit_page_length=GEOCODE_BACKFILL_MAX * 3,
+    runs = frappe.db.sql(
+        """SELECT name, route_points FROM `tabRun`
+           WHERE (country IS NULL OR country = '')
+             AND route_points IS NOT NULL AND route_points != ''
+           LIMIT %s""",
+        (GEOCODE_BACKFILL_MAX * 3,),
+        as_dict=True,
     )
 
     for run in runs:
@@ -65,7 +79,7 @@ def backfill_geo_fields():
         frappe.db.commit()
         time.sleep(1)
 
-    remaining = frappe.db.count("Run", filters={"country": ["in", ["", None]], "route_points": ["!=", ""]})
+    remaining = _pending_geo_count()
     return {"updated": updated, "more_pending": remaining > 0, "remaining": remaining}
 
 
@@ -147,13 +161,17 @@ def refresh_location_summary():
 
 @frappe.whitelist(allow_guest=True)
 def get_location_summary():
-    """Cached read only — no LLM call, safe for the public dashboard load."""
+    """Cached read only — no LLM call, safe for the public dashboard load.
+    Includes the actual lists (not just counts) for the drill-down cards."""
     text = frappe.db.get_single_value(SETTINGS, "location_summary_text") or ""
     updated = frappe.db.get_single_value(SETTINGS, "location_summary_updated")
     countries, states, districts = _distinct_geo()
     return {
         "summary": text,
         "updated": str(updated) if updated else None,
+        "countries": countries,
+        "states": states,
+        "districts": districts,
         "country_count": len(countries),
         "state_count": len(states),
         "district_count": len(districts),

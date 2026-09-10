@@ -26,15 +26,37 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /* ── LOCATION SUMMARY ── */
+var rwGeoData = { countries: [], states: [], districts: [] };
+
 function rwRenderGeoSummary(data) {
-    var stats = document.getElementById('rw-geo-stats');
+    rwGeoData.countries = data.countries || [];
+    rwGeoData.states = data.states || [];
+    rwGeoData.districts = data.districts || [];
+
+    var cEl = document.getElementById('rw-geo-country-count');
+    var sEl = document.getElementById('rw-geo-state-count');
+    var dEl = document.getElementById('rw-geo-district-count');
     var text = document.getElementById('rw-geo-text');
-    if (!stats || !text) return;
-    var countryCount = data.country_count || (data.countries || []).length || 0;
-    var stateCount = data.state_count || (data.states || []).length || 0;
-    var districtCount = data.district_count || (data.districts || []).length || 0;
-    stats.textContent = '🌐 ' + countryCount + ' countries · ' + stateCount + ' states · ' + districtCount + ' districts';
-    text.textContent = data.summary || '';
+    if (cEl) cEl.textContent = data.country_count != null ? data.country_count : rwGeoData.countries.length;
+    if (sEl) sEl.textContent = data.state_count != null ? data.state_count : rwGeoData.states.length;
+    if (dEl) dEl.textContent = data.district_count != null ? data.district_count : rwGeoData.districts.length;
+    if (text) text.textContent = data.summary || '';
+}
+
+function rwOpenGeoModal(kind) {
+    var titles = { countries: 'Countries', states: 'States', districts: 'Districts' };
+    var list = rwGeoData[kind] || [];
+    document.getElementById('rw-geo-modal-title').textContent = titles[kind] || kind;
+    var ul = document.getElementById('rw-geo-modal-list');
+    ul.innerHTML = list.length
+        ? list.map(function(name) { return '<li>' + name + '</li>'; }).join('')
+        : '<li style="color:#6b7280">No data yet — sync some runs first.</li>';
+    document.getElementById('rw-geo-modal').style.display = 'flex';
+}
+
+function rwCloseGeoModal(e) {
+    if (!e || e.target === document.getElementById('rw-geo-modal'))
+        document.getElementById('rw-geo-modal').style.display = 'none';
 }
 
 function rwLoadGeoSummary() {

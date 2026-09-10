@@ -26,10 +26,36 @@
     </div>
 
     <!-- LOCATION SUMMARY -->
-    <div class="rw-geo-card" id="rw-geo-card">
-      <div class="rw-geo-stats" id="rw-geo-stats">&#127760; Loading location summary&hellip;</div>
+    <div class="rw-geo-section">
+      <div class="rw-geo-cards">
+        <div class="rw-geo-card" onclick="rwOpenGeoModal('countries')">
+          <div class="rw-geo-val" id="rw-geo-country-count">&hellip;</div>
+          <div class="rw-geo-lbl">&#127760; Countries</div>
+        </div>
+        <div class="rw-geo-card" onclick="rwOpenGeoModal('states')">
+          <div class="rw-geo-val" id="rw-geo-state-count">&hellip;</div>
+          <div class="rw-geo-lbl">States</div>
+        </div>
+        <div class="rw-geo-card" onclick="rwOpenGeoModal('districts')">
+          <div class="rw-geo-val" id="rw-geo-district-count">&hellip;</div>
+          <div class="rw-geo-lbl">Districts</div>
+        </div>
+      </div>
       <div class="rw-geo-text" id="rw-geo-text"></div>
       <button class="rw-btn-import" id="rw-geo-refresh-btn" onclick="rwRefreshGeoSummary()" style="display:none">&#8635; Refresh Summary</button>
+    </div>
+
+    <!-- GEO DRILL-DOWN MODAL -->
+    <div class="rw-modal-overlay" id="rw-geo-modal" style="display:none" onclick="rwCloseGeoModal(event)">
+      <div class="rw-modal" style="max-width:360px">
+        <div class="rw-modal-header">
+          <div class="rw-modal-title" id="rw-geo-modal-title">&nbsp;</div>
+          <button class="rw-modal-close" onclick="rwCloseGeoModal()">&#215;</button>
+        </div>
+        <div class="rw-modal-body" style="padding:16px 24px">
+          <ul class="rw-geo-list" id="rw-geo-modal-list"></ul>
+        </div>
+      </div>
     </div>
 
     <!-- TICKER -->
