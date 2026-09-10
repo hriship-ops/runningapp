@@ -357,3 +357,32 @@ def backfill_hr_from_points():
         updated += 1
     frappe.db.commit()
     return {"updated": updated, "checked": len(runs)}
+
+
+def debug_raw_tcx_span(activity_id):
+    """Diagnostic: raw trackpoint count/time span before downsampling."""
+    from garminconnect import Garmin
+
+    client = get_garmin_client()
+    tcx_bytes = client.download_activity(str(activity_id), dl_fmt=Garmin.ActivityDownloadFormat.TCX)
+    data = tcx_bytes
+    if data[:2] == b"\x1f\x8b":
+        data = gzip.decompress(data)
+    xml_start = data.find(b"<?xml")
+    if xml_start > 0:
+        data = data[xml_start:]
+    root = ET.fromstring(data)
+    trackpoints = root.findall(f".//{TCX_NS}Trackpoint")
+    times = []
+    for tp in trackpoints:
+        time_el = tp.find(f"{TCX_NS}Time")
+        if time_el is not None and time_el.text:
+            times.append(time_el.text)
+    result = {"raw_trackpoint_count": len(trackpoints), "times_found": len(times)}
+    if times:
+        t0 = datetime.fromisoformat(times[0].replace("Z", "+00:00"))
+        t_last = datetime.fromisoformat(times[-1].replace("Z", "+00:00"))
+        result["first_time"] = times[0]
+        result["last_time"] = times[-1]
+        result["raw_span_sec"] = round((t_last - t0).total_seconds())
+    return result
