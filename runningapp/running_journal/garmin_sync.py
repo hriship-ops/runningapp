@@ -308,12 +308,12 @@ def sync_garmin(full_sync=False):
                 skipped += 1
                 continue
 
+            # No "skip if no GPS" here — pool swims, treadmill, and gym
+            # activities never have a route at all, and skipping them
+            # meant they were never imported, period, not just missing
+            # their map. run-detail already handles empty route_points
+            # by simply not showing a map.
             points = fetch_activity_route(client, garmin_id)
-            if not points:
-                # No route data available for this activity — skip rather
-                # than insert a run with a blank map.
-                skipped += 1
-                continue
 
             run_data = activity_to_run(activity, points, settings)
             run = frappe.get_doc(run_data)
