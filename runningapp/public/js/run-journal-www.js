@@ -46,7 +46,23 @@ function rwRenderGeoSummary(data) {
 var RW_GEO_FIELD = { countries: 'country', states: 'state', districts: 'district' };
 var RW_GEO_NEXT = { country: 'state', state: 'district', district: null };
 var RW_GEO_TITLES = { country: 'Countries', state: 'States', district: 'Districts' };
+var RW_GEO_EMPTY = '(Unspecified)';
 var rwGeoFilters = {};
+
+/* A run matches filters[k] if its own field value equals filters[k], with
+   RW_GEO_EMPTY treated as "this field is blank" — not all reverse-geocode
+   results include a county/district (common outside India), so a run
+   missing that field would otherwise be unreachable via drill-down
+   entirely instead of showing up under an "(Unspecified)" bucket. */
+function rwGeoMatchesFilters(r, filters) {
+    for (var k in filters) {
+        var want = filters[k];
+        var have = r[k] || '';
+        if (want === RW_GEO_EMPTY) { if (have !== '') return false; }
+        else if (have !== want) return false;
+    }
+    return true;
+}
 
 /* Distinct values for `field` among runs matching `filters`, computed
    client-side from the already-loaded rwAllRuns — no extra API calls
@@ -55,12 +71,15 @@ function rwGeoDistinct(field, filters) {
     var seen = {};
     var out = [];
     rwAllRuns.forEach(function(r) {
-        var val = r[field];
-        if (!val) return;
-        for (var k in filters) { if (r[k] !== filters[k]) return; }
+        if (!rwGeoMatchesFilters(r, filters)) return;
+        var val = r[field] || RW_GEO_EMPTY;
         if (!seen[val]) { seen[val] = true; out.push(val); }
     });
-    return out.sort();
+    out.sort();
+    // Keep "(Unspecified)" at the end rather than sorted alphabetically in the middle.
+    var i = out.indexOf(RW_GEO_EMPTY);
+    if (i > -1) { out.splice(i, 1); out.push(RW_GEO_EMPTY); }
+    return out;
 }
 
 function rwEsc(s) { return String(s).replace(/'/g, "\\'"); }
@@ -99,11 +118,7 @@ function rwCloseGeoModal(e) {
 }
 
 function rwShowRunsForGeoFilters(label) {
-    var filters = rwGeoFilters;
-    var runs = rwAllRuns.filter(function(r) {
-        for (var k in filters) { if (r[k] !== filters[k]) return false; }
-        return true;
-    });
+    var runs = rwAllRuns.filter(function(r) { return rwGeoMatchesFilters(r, rwGeoFilters); });
     var rows = runs.map(function(r) {
         return '<tr onclick="rwOpenDetail(\'' + r.name + '\')">' +
             '<td>' + fmtDate(r.date) + '</td><td>' + actPill(r.activity_type) + '</td>' +
