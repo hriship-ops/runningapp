@@ -25,6 +25,13 @@
       </div>
     </div>
 
+    <!-- LOCATION SUMMARY -->
+    <div class="rw-geo-card" id="rw-geo-card">
+      <div class="rw-geo-stats" id="rw-geo-stats">&#127760; Loading location summary&hellip;</div>
+      <div class="rw-geo-text" id="rw-geo-text"></div>
+      <button class="rw-btn-import" id="rw-geo-refresh-btn" onclick="rwRefreshGeoSummary()" style="display:none">&#8635; Refresh Summary</button>
+    </div>
+
     <!-- TICKER -->
     <div class="rw-ticker-wrap">
       <div class="rw-ticker-label">Recent</div>
@@ -159,6 +166,7 @@
         var user = data.message;
         if (user && user !== 'Guest') {
           document.getElementById('rw-sync-btn').style.display = '';
+          document.getElementById('rw-geo-refresh-btn').style.display = '';
           document.getElementById('rw-login-btn').style.display = 'none';
           document.getElementById('rw-logout-btn').style.display = '';
         }

@@ -31,7 +31,7 @@ from frappe.utils.password import get_decrypted_password
 from runningapp.running_journal.strava_sync import (
     get_analytics_settings,
     compute_age,
-    get_location,
+    get_location_details,
     compute_calories_keytel,
     compute_calories_met,
     compute_vdot,
@@ -192,8 +192,11 @@ def activity_to_run(activity, points, settings):
                 max_hr_val = max(hr_vals)
 
     location = ""
+    geo = {"country": "", "state": "", "district": ""}
     if points:
-        location = get_location(points[0]["lat"], points[0]["lon"])
+        details = get_location_details(points[0]["lat"], points[0]["lon"])
+        location = details["display"]
+        geo = details
 
     calories = int(activity.get("calories", 0) or 0)
     calorie_source = "garmin" if calories > 0 else ""
@@ -217,6 +220,9 @@ def activity_to_run(activity, points, settings):
         "date": start_date,
         "activity_type": activity_type,
         "location": location,
+        "country": geo["country"],
+        "state": geo["state"],
+        "district": geo["district"],
         "distance_km": distance_km,
         "duration_sec": duration_sec,
         "elevation_gain": elev_gain,

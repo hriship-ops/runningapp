@@ -22,7 +22,50 @@ document.addEventListener('DOMContentLoaded', function() {
     rwLoadAllRuns();
     rwSearch();
     rwLoadTicker();
+    rwLoadGeoSummary();
 });
+
+/* ── LOCATION SUMMARY ── */
+function rwRenderGeoSummary(data) {
+    var stats = document.getElementById('rw-geo-stats');
+    var text = document.getElementById('rw-geo-text');
+    if (!stats || !text) return;
+    var countryCount = data.country_count || (data.countries || []).length || 0;
+    var stateCount = data.state_count || (data.states || []).length || 0;
+    var districtCount = data.district_count || (data.districts || []).length || 0;
+    stats.textContent = '🌐 ' + countryCount + ' countries · ' + stateCount + ' states · ' + districtCount + ' districts';
+    text.textContent = data.summary || '';
+}
+
+function rwLoadGeoSummary() {
+    fetch('/api/method/runningapp.running_journal.location_summary.get_location_summary')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { rwRenderGeoSummary(data.message || {}); })
+    .catch(function() {});
+}
+
+function rwRefreshGeoSummary() {
+    var btn = document.getElementById('rw-geo-refresh-btn');
+    if (btn) btn.textContent = 'Summarizing...';
+    fetch('/api/method/runningapp.running_journal.location_summary.refresh_location_summary', { method: 'GET' })
+    .then(function(r) {
+        if (!r.ok) {
+            return r.json().catch(function() { return {}; }).then(function(body) {
+                var msg = (body && body._server_messages) ? JSON.parse(JSON.parse(body._server_messages)[0]).message : (body && body.message) || ('Refresh failed (HTTP ' + r.status + ')');
+                throw new Error(msg);
+            });
+        }
+        return r.json();
+    })
+    .then(function(data) {
+        if (btn) btn.textContent = '↻ Refresh Summary';
+        rwRenderGeoSummary(data.message || {});
+    })
+    .catch(function(err) {
+        if (btn) btn.textContent = '↻ Refresh Summary';
+        alert('Location summary refresh failed: ' + (err && err.message ? err.message : 'unknown error'));
+    });
+}
 
 function rwLoadAllRuns() {
     fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify([])))

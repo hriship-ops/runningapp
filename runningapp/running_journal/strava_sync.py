@@ -122,7 +122,9 @@ def fetch_activity_streams(activity_id):
 
 
 # ── Geocoding ─────────────────────────────────────────────────────────────────
-def get_location(lat, lon):
+def get_location_details(lat, lon):
+    """Reverse-geocode to both a short display string and the structured
+    country/state/district, in one Nominatim call."""
     try:
         r = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -131,17 +133,27 @@ def get_location(lat, lon):
             timeout=5
         )
         data = r.json()
-        parts = []
         addr = data.get("address", {})
+        parts = []
         for key in ["suburb", "neighbourhood", "city", "town", "village"]:
             if addr.get(key):
                 parts.append(addr[key])
                 break
         if addr.get("city") and addr["city"] not in parts:
             parts.append(addr["city"])
-        return ", ".join(parts) if parts else data.get("display_name", "")[:50]
+        display = ", ".join(parts) if parts else data.get("display_name", "")[:50]
+        return {
+            "display": display,
+            "country": addr.get("country", ""),
+            "state": addr.get("state", ""),
+            "district": addr.get("state_district") or addr.get("county") or "",
+        }
     except:
-        return ""
+        return {"display": "", "country": "", "state": "", "district": ""}
+
+
+def get_location(lat, lon):
+    return get_location_details(lat, lon)["display"]
 
 
 # ── Analytics formulae ────────────────────────────────────────────────────────
@@ -287,9 +299,12 @@ def activity_to_run(activity, detail, streams, settings):
 
     # Location
     location = ""
+    geo = {"country": "", "state": "", "district": ""}
     start_latlng = activity.get("start_latlng", [])
     if start_latlng and len(start_latlng) == 2:
-        location = get_location(start_latlng[0], start_latlng[1])
+        details = get_location_details(start_latlng[0], start_latlng[1])
+        location = details["display"]
+        geo = details
 
     # Calories — detail endpoint first, then Keytel, then MET
     calories       = int(detail.get("calories", 0) or 0)
@@ -323,6 +338,9 @@ def activity_to_run(activity, detail, streams, settings):
         "date":               start_date,
         "activity_type":      activity_type,
         "location":           location,
+        "country":            geo["country"],
+        "state":              geo["state"],
+        "district":           geo["district"],
         "distance_km":        distance_km,
         "duration_sec":       duration_sec,
         "elevation_gain":     elev_gain,

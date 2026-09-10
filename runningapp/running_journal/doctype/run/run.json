@@ -11,6 +11,9 @@
   "date",
   "activity_type",
   "location",
+  "country",
+  "state",
+  "district",
   "distance_km",
   "duration_sec",
   "elevation_gain",
@@ -69,6 +72,24 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Location"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Data",
+   "label": "Country",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State",
+   "read_only": 1
+  },
+  {
+   "fieldname": "district",
+   "fieldtype": "Data",
+   "label": "District",
+   "read_only": 1
   },
   {
    "fieldname": "distance_km",

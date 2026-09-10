@@ -25,7 +25,12 @@
   "garmin_email",
   "garmin_password",
   "garmin_last_sync",
-  "garmin_sync_cursor"
+  "garmin_sync_cursor",
+  "llm_provider",
+  "llm_api_key",
+  "llm_model",
+  "location_summary_text",
+  "location_summary_updated"
  ],
  "fields": [
   {
@@ -132,6 +137,35 @@
    "fieldname": "garmin_sync_cursor",
    "fieldtype": "Int",
    "label": "Garmin Sync Cursor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "llm_provider",
+   "fieldtype": "Select",
+   "label": "LLM Provider",
+   "options": "Anthropic\nOpenRouter"
+  },
+  {
+   "fieldname": "llm_api_key",
+   "fieldtype": "Password",
+   "label": "LLM API Key"
+  },
+  {
+   "fieldname": "llm_model",
+   "fieldtype": "Data",
+   "label": "LLM Model",
+   "description": "e.g. claude-sonnet-4-5-20250929 (Anthropic) or anthropic/claude-sonnet-4.5 (OpenRouter). Leave blank for a sensible default."
+  },
+  {
+   "fieldname": "location_summary_text",
+   "fieldtype": "Long Text",
+   "label": "Location Summary (cached)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "location_summary_updated",
+   "fieldtype": "Datetime",
+   "label": "Location Summary Updated",
    "read_only": 1
   }
  ],
