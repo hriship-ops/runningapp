@@ -32,6 +32,7 @@ from runningapp.running_journal.strava_sync import (
     get_analytics_settings,
     compute_age,
     get_location_details,
+    first_latlon,
     compute_calories_keytel,
     compute_calories_met,
     compute_vdot,
@@ -198,9 +199,10 @@ def activity_to_run(activity, points, settings):
     # permanently marking this run as having no location data. NULL rows
     # get picked up and retried by location_summary.backfill_geo_fields().
     geo = None
-    if points:
+    ll = first_latlon(points) if points else None
+    if ll:
         try:
-            details = get_location_details(points[0]["lat"], points[0]["lon"])
+            details = get_location_details(ll[0], ll[1])
             location = details["display"]
             geo = details
         except Exception:

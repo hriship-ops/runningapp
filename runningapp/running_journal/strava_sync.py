@@ -161,6 +161,18 @@ def get_location(lat, lon):
         return ""
 
 
+def first_latlon(points):
+    """First point in a route_points list that actually has GPS coordinates.
+    The very first sample is often a GPS-not-locked-yet reading (just
+    {"t":.., "hr":..}, no lat/lon) while later points do have a fix —
+    blindly using points[0] silently treated plenty of real outdoor runs
+    as having no location at all."""
+    for p in points:
+        if isinstance(p, dict) and p.get("lat") is not None and p.get("lon") is not None:
+            return p["lat"], p["lon"]
+    return None
+
+
 # ── Analytics formulae ────────────────────────────────────────────────────────
 def compute_calories_keytel(avg_hr, duration_sec, weight, age, gender):
     """

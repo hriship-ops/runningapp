@@ -16,7 +16,7 @@ import frappe
 import requests
 from frappe.utils.password import get_decrypted_password
 
-from runningapp.running_journal.strava_sync import get_location_details
+from runningapp.running_journal.strava_sync import get_location_details, first_latlon
 
 SETTINGS = "Run Settings"
 
@@ -64,18 +64,22 @@ def backfill_geo_fields():
 
         try:
             points = json.loads(run.route_points)
-            lat = points[0]["lat"]
-            lon = points[0]["lon"]
+            ll = first_latlon(points)
         except Exception:
-            # Malformed/unexpected route_points shape — permanently
-            # unfixable, mark with the '' sentinel (not NULL) so it's
-            # skipped on future calls instead of failing forever.
+            ll = None
+
+        if ll is None:
+            # No point in the whole array has GPS coordinates (not just
+            # the first one) — permanently unfixable, mark with the ''
+            # sentinel (not NULL) so it's skipped on future calls instead
+            # of failing forever.
             frappe.db.set_value(
                 "Run", run.name, {"country": "", "state": "", "district": ""}, update_modified=False,
             )
             updated += 1
             frappe.db.commit()
             continue
+        lat, lon = ll
 
         try:
             details = get_location_details(lat, lon)
@@ -217,3 +221,34 @@ def reset_bad_geo_data():
     frappe.db.commit()
     remaining = _pending_geo_count()
     return {"reset": frappe.db.sql("SELECT ROW_COUNT()")[0][0], "now_pending": remaining}
+
+
+def reset_recoverable_geo_data():
+    """One-off: clear country/state/district back to NULL for runs marked
+    '' (no location) where route_points actually does contain GPS
+    coordinates somewhere in the array — just not in the very first
+    sample, which the old code assumed always had a lat/lon. A GPS fix
+    frequently hasn't locked yet at the first recorded point (a
+    {"t":.., "hr":..}-only sample), while every point after it does have
+    coordinates. Only rows with genuinely no GPS anywhere (pool swims,
+    treadmill) are left alone. No network calls — pure DB read/parse/write,
+    completes in one call."""
+    rows = frappe.db.sql(
+        """SELECT name, route_points FROM `tabRun`
+           WHERE country = '' AND route_points IS NOT NULL AND route_points != ''""",
+        as_dict=True,
+    )
+    reset = 0
+    for row in rows:
+        try:
+            points = json.loads(row.route_points)
+        except Exception:
+            continue
+        if first_latlon(points) is not None:
+            frappe.db.set_value(
+                "Run", row.name, {"country": None, "state": None, "district": None}, update_modified=False,
+            )
+            reset += 1
+    frappe.db.commit()
+    remaining = _pending_geo_count()
+    return {"reset": reset, "checked": len(rows), "now_pending": remaining}
