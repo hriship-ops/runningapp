@@ -194,9 +194,12 @@ def activity_to_run(activity, points, settings):
     location = ""
     geo = {"country": "", "state": "", "district": ""}
     if points:
-        details = get_location_details(points[0]["lat"], points[0]["lon"])
-        location = details["display"]
-        geo = details
+        try:
+            details = get_location_details(points[0]["lat"], points[0]["lon"])
+            location = details["display"]
+            geo = details
+        except Exception:
+            pass
 
     calories = int(activity.get("calories", 0) or 0)
     calorie_source = "garmin" if calories > 0 else ""

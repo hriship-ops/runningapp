@@ -124,36 +124,41 @@ def fetch_activity_streams(activity_id):
 # ── Geocoding ─────────────────────────────────────────────────────────────────
 def get_location_details(lat, lon):
     """Reverse-geocode to both a short display string and the structured
-    country/state/district, in one Nominatim call."""
-    try:
-        r = requests.get(
-            "https://nominatim.openstreetmap.org/reverse",
-            params={"lat": lat, "lon": lon, "format": "json"},
-            headers={"User-Agent": "RunningJournal/1.0"},
-            timeout=5
-        )
-        data = r.json()
-        addr = data.get("address", {})
-        parts = []
-        for key in ["suburb", "neighbourhood", "city", "town", "village"]:
-            if addr.get(key):
-                parts.append(addr[key])
-                break
-        if addr.get("city") and addr["city"] not in parts:
-            parts.append(addr["city"])
-        display = ", ".join(parts) if parts else data.get("display_name", "")[:50]
-        return {
-            "display": display,
-            "country": addr.get("country", ""),
-            "state": addr.get("state", ""),
-            "district": addr.get("state_district") or addr.get("county") or "",
-        }
-    except:
-        return {"display": "", "country": "", "state": "", "district": ""}
+    country/state/district, in one Nominatim call. Raises on network/HTTP
+    failure so callers can tell "the request failed, try again later" apart
+    from "Nominatim genuinely has no address data for this point" — those
+    aren't the same thing, and conflating them was silently mislabeling
+    transient failures as permanent unknown-location runs."""
+    r = requests.get(
+        "https://nominatim.openstreetmap.org/reverse",
+        params={"lat": lat, "lon": lon, "format": "json", "accept-language": "en"},
+        headers={"User-Agent": "RunningJournal/1.0"},
+        timeout=5
+    )
+    r.raise_for_status()
+    data = r.json()
+    addr = data.get("address", {})
+    parts = []
+    for key in ["suburb", "neighbourhood", "city", "town", "village"]:
+        if addr.get(key):
+            parts.append(addr[key])
+            break
+    if addr.get("city") and addr["city"] not in parts:
+        parts.append(addr["city"])
+    display = ", ".join(parts) if parts else data.get("display_name", "")[:50]
+    return {
+        "display": display,
+        "country": addr.get("country", ""),
+        "state": addr.get("state", ""),
+        "district": addr.get("state_district") or addr.get("county") or "",
+    }
 
 
 def get_location(lat, lon):
-    return get_location_details(lat, lon)["display"]
+    try:
+        return get_location_details(lat, lon)["display"]
+    except Exception:
+        return ""
 
 
 # ── Analytics formulae ────────────────────────────────────────────────────────
@@ -302,9 +307,12 @@ def activity_to_run(activity, detail, streams, settings):
     geo = {"country": "", "state": "", "district": ""}
     start_latlng = activity.get("start_latlng", [])
     if start_latlng and len(start_latlng) == 2:
-        details = get_location_details(start_latlng[0], start_latlng[1])
-        location = details["display"]
-        geo = details
+        try:
+            details = get_location_details(start_latlng[0], start_latlng[1])
+            location = details["display"]
+            geo = details
+        except Exception:
+            pass
 
     # Calories — detail endpoint first, then Keytel, then MET
     calories       = int(detail.get("calories", 0) or 0)

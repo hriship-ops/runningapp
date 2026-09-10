@@ -62,19 +62,29 @@ def backfill_geo_fields():
         if updated >= GEOCODE_BACKFILL_MAX or (time.monotonic() - t_start) > GEOCODE_TIME_BUDGET_SEC:
             break
 
-        details = {"country": "", "state": "", "district": ""}
         try:
             points = json.loads(run.route_points)
             lat = points[0]["lat"]
             lon = points[0]["lon"]
         except Exception:
-            # Malformed/unexpected route_points shape — mark with the ''
-            # sentinel (not NULL) so this row is skipped on future calls
-            # instead of being re-selected and re-failing forever.
-            points = None
+            # Malformed/unexpected route_points shape — permanently
+            # unfixable, mark with the '' sentinel (not NULL) so it's
+            # skipped on future calls instead of failing forever.
+            frappe.db.set_value(
+                "Run", run.name, {"country": "", "state": "", "district": ""}, update_modified=False,
+            )
+            updated += 1
+            frappe.db.commit()
+            continue
 
-        if points is not None:
+        try:
             details = get_location_details(lat, lon)
+        except Exception:
+            # Network/HTTP failure — transient, leave country as NULL so
+            # this row is retried on a later call instead of being
+            # permanently mislabeled as having no location data.
+            continue
+        finally:
             time.sleep(1)  # Nominatim usage policy: max 1 req/sec
 
         frappe.db.set_value(
@@ -182,3 +192,28 @@ def get_location_summary():
         "state_count": len(states),
         "district_count": len(districts),
     }
+
+
+def reset_bad_geo_data():
+    """One-off: clear country/state/district back to NULL for rows that
+    were affected by two now-fixed bugs, so backfill_geo_fields() re-does
+    them with the corrected code:
+      1. Nominatim requests that failed (timeout/HTTP error/rate limit)
+         were caught by a bare except and mislabeled with the same ''
+         sentinel as a genuine "no address data" result — indistinguishable
+         from the outside, so every '' row is suspect, not just some.
+      2. No accept-language=en was sent, so non-Latin-script countries
+         (Nepal, Bhutan, ...) got stored in the local script.
+    Safe to run once; does not touch rows with a clean ASCII value that
+    was never ''."""
+    result = frappe.db.sql(
+        """UPDATE `tabRun`
+           SET country = NULL, state = NULL, district = NULL
+           WHERE country = ''
+              OR country REGEXP '[^ -~]'
+              OR state REGEXP '[^ -~]'
+              OR district REGEXP '[^ -~]'"""
+    )
+    frappe.db.commit()
+    remaining = _pending_geo_count()
+    return {"reset": frappe.db.sql("SELECT ROW_COUNT()")[0][0], "now_pending": remaining}
