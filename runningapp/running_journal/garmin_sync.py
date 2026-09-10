@@ -162,7 +162,17 @@ def _is_duplicate(activity_date, activity_type, distance_km, duration_sec):
         fields=["name", "distance_km", "duration_sec"],
     )
     for c in candidates:
-        dist_ok = abs((c.distance_km or 0) - distance_km) <= max(0.05, distance_km * 0.03)
+        dist_diff = abs((c.distance_km or 0) - distance_km)
+        # Distance alone is enough when it's a near-exact match: pool
+        # swims especially are lap-counted, so distance is essentially
+        # identical across sources, while duration commonly isn't — one
+        # pipeline counts rest-between-sets, another doesn't. A tight
+        # duration tolerance on top of a loose distance one (the original
+        # rule) missed same-day swims that matched to 3 decimal places on
+        # distance but differed 10-50% on duration.
+        if distance_km > 0 and dist_diff <= max(0.02, distance_km * 0.01):
+            return True
+        dist_ok = dist_diff <= max(0.05, distance_km * 0.03)
         dur_ok = abs((c.duration_sec or 0) - duration_sec) <= max(30, duration_sec * 0.05)
         if dist_ok and dur_ok:
             return True
