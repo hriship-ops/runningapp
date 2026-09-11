@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Settings — Run Journal</title>
+  <link rel="stylesheet" href="/assets/runningapp/css/run-journal-www.css">
+  <style>
+    .rs-wrap { max-width:520px; margin:0 auto; padding:24px 16px 60px; }
+    .rs-back { color:#9ca3af; font-size:13px; text-decoration:none; }
+    .rs-back:hover { color:#f1f5f9; }
+    .rs-card { background:#1f2937; border:1px solid #374151; border-radius:10px; padding:20px; margin-top:20px; }
+    .rs-card-title { font-size:15px; font-weight:700; color:#f1f5f9; margin-bottom:4px; }
+    .rs-card-sub { font-size:12px; color:#9ca3af; margin-bottom:16px; }
+    .rs-field { margin-bottom:14px; }
+    .rs-label { display:block; color:#9ca3af; font-size:12px; margin-bottom:6px; }
+    .rs-input, .rs-select {
+      width:100%; box-sizing:border-box; background:#111827; border:1px solid #374151;
+      color:#f1f5f9; padding:8px 12px; border-radius:6px; font-size:14px;
+    }
+    .rs-row { display:flex; gap:12px; }
+    .rs-row > .rs-field { flex:1; }
+    .rs-btn { background:#3b82f6; color:#fff; border:none; padding:10px 16px; border-radius:6px; font-size:14px; cursor:pointer; }
+    .rs-btn:hover { background:#2563eb; }
+    .rs-btn-strava { background:#fc4c02; }
+    .rs-btn-strava:hover { background:#e04400; }
+    .rs-btn-danger { background:#374151; color:#f87171; border:1px solid #4b5563; }
+    .rs-btn-danger:hover { background:#4b5563; }
+    .rs-status { display:inline-flex; align-items:center; gap:6px; font-size:13px; margin-bottom:14px; }
+    .rs-dot { width:8px; height:8px; border-radius:50%; }
+    .rs-dot.on { background:#22c55e; }
+    .rs-dot.off { background:#6b7280; }
+    .rs-msg { font-size:13px; margin-top:10px; display:none; }
+    .rs-msg.ok { color:#22c55e; }
+    .rs-msg.err { color:#ef4444; }
+    .rs-gate { text-align:center; padding:80px 20px; color:#9ca3af; }
+    .rs-link-box { background:#111827; border:1px solid #374151; border-radius:6px; padding:10px; font-size:12px; word-break:break-all; color:#9ca3af; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="rw-app">
+    <div class="rw-header">
+      <div class="rw-logo">
+        <div class="rw-logo-icon">&#9673;</div>
+        <div>
+          <div class="rw-logo-title">Settings</div>
+          <div class="rw-logo-sub"><a class="rs-back" href="/run-journal">&larr; Back to journal</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rs-wrap" id="rs-gate">
+      <div class="rs-gate">Checking login&hellip;</div>
+    </div>
+
+    <div class="rs-wrap" id="rs-body" style="display:none">
+
+      <!-- GARMIN -->
+      <div class="rs-card">
+        <div class="rs-card-title">Garmin Connect</div>
+        <div class="rs-card-sub">Your own Garmin email/password — used only to sync your activities.</div>
+        <div class="rs-status"><span class="rs-dot off" id="rs-garmin-dot"></span><span id="rs-garmin-status">Not connected</span></div>
+        <div class="rs-field">
+          <label class="rs-label">Garmin Email</label>
+          <input class="rs-input" id="rs-garmin-email" type="email">
+        </div>
+        <div class="rs-field">
+          <label class="rs-label">Garmin Password <span id="rs-garmin-pw-hint" style="display:none">(leave blank to keep current)</span></label>
+          <input class="rs-input" id="rs-garmin-password" type="password" autocomplete="new-password">
+        </div>
+        <button class="rs-btn" onclick="rsSaveGarmin()">Save</button>
+        <div class="rs-msg" id="rs-garmin-msg"></div>
+      </div>
+
+      <!-- STRAVA -->
+      <div class="rs-card">
+        <div class="rs-card-title">Strava</div>
+        <div class="rs-card-sub">Connect your own Strava account — you'll be redirected to Strava to approve access.</div>
+        <div class="rs-status"><span class="rs-dot off" id="rs-strava-dot"></span><span id="rs-strava-status">Not connected</span></div>
+        <button class="rs-btn rs-btn-strava" id="rs-strava-connect-btn" onclick="rsConnectStrava()">Connect with Strava</button>
+        <button class="rs-btn rs-btn-danger" id="rs-strava-disconnect-btn" onclick="rsDisconnectStrava()" style="display:none">Disconnect</button>
+        <div class="rs-msg" id="rs-strava-msg"></div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="rs-card">
+        <div class="rs-card-title">Profile</div>
+        <div class="rs-card-sub">Used for calorie/effort calculations.</div>
+        <div class="rs-row">
+          <div class="rs-field">
+            <label class="rs-label">Weight (kg)</label>
+            <input class="rs-input" id="rs-weight" type="number" step="0.1">
+          </div>
+          <div class="rs-field">
+            <label class="rs-label">Gender</label>
+            <select class="rs-select" id="rs-gender">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="rs-row">
+          <div class="rs-field">
+            <label class="rs-label">Date of Birth</label>
+            <input class="rs-input" id="rs-dob" type="date">
+          </div>
+          <div class="rs-field">
+            <label class="rs-label">Resting HR (bpm)</label>
+            <input class="rs-input" id="rs-resting-hr" type="number">
+          </div>
+        </div>
+        <div class="rs-row">
+          <div class="rs-field">
+            <label class="rs-label">Units</label>
+            <select class="rs-select" id="rs-units">
+              <option value="Metric">Metric</option>
+              <option value="Imperial">Imperial</option>
+            </select>
+          </div>
+          <div class="rs-field">
+            <label class="rs-label">Pace Format</label>
+            <select class="rs-select" id="rs-pace-format">
+              <option value="min/km">min/km</option>
+              <option value="min/mile">min/mile</option>
+            </select>
+          </div>
+        </div>
+        <button class="rs-btn" onclick="rsSaveProfile()">Save</button>
+        <div class="rs-msg" id="rs-profile-msg"></div>
+      </div>
+
+      <!-- INVITE (owner only) -->
+      <div class="rs-card" id="rs-invite-card" style="display:none">
+        <div class="rs-card-title">Invite someone</div>
+        <div class="rs-card-sub">Creates them a login and gives you a one-time link to send them — no email is sent automatically.</div>
+        <div class="rs-field">
+          <label class="rs-label">Their email</label>
+          <input class="rs-input" id="rs-invite-email" type="email">
+        </div>
+        <button class="rs-btn" onclick="rsInvite()">Generate invite link</button>
+        <div class="rs-msg" id="rs-invite-msg"></div>
+        <div class="rs-link-box" id="rs-invite-link" style="display:none"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    var RS_OWNER = 'hrishi.p@azimpremjifoundation.org';
+    var RS_CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
+    function rsApi(method, args) {
+      return fetch('/api/method/' + method, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': RS_CSRF},
+        body: JSON.stringify(args || {})
+      }).then(function(r) { return r.json(); });
+    }
+
+    function rsShowMsg(id, text, ok) {
+      var el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'rs-msg ' + (ok ? 'ok' : 'err');
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 4000);
+    }
+
+    fetch('/api/method/frappe.auth.get_logged_user')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var user = data.message;
+        if (!user || user === 'Guest') {
+          document.getElementById('rs-gate').innerHTML =
+            '<div class="rs-gate">You need to be logged in to see your settings.<br><br>' +
+            '<a class="rs-back" href="/run-journal">&larr; Go back and log in</a></div>';
+          return;
+        }
+        document.getElementById('rs-gate').style.display = 'none';
+        document.getElementById('rs-body').style.display = 'block';
+        if (user === RS_OWNER) {
+          document.getElementById('rs-invite-card').style.display = 'block';
+        }
+        rsLoadSettings();
+
+        var params = new URLSearchParams(location.search);
+        var strava = params.get('strava');
+        if (strava === 'connected') rsShowMsg('rs-strava-msg', 'Strava connected!', true);
+        if (strava === 'denied') rsShowMsg('rs-strava-msg', 'Strava connection was cancelled.', false);
+        if (strava === 'error') rsShowMsg('rs-strava-msg', 'Strava connection failed — try again.', false);
+        if (strava) history.replaceState(null, '', '/run-settings');
+      });
+
+    function rsLoadSettings() {
+      rsApi('runningapp.running_journal.settings_api.get_my_settings').then(function(res) {
+        var d = res.message || {};
+        document.getElementById('rs-garmin-email').value = d.garmin_email || '';
+        document.getElementById('rs-weight').value = d.weight_kg || '';
+        document.getElementById('rs-gender').value = d.gender || 'Male';
+        document.getElementById('rs-dob').value = d.date_of_birth || '';
+        document.getElementById('rs-resting-hr').value = d.resting_heart_rate || d.resting_hr || '';
+        document.getElementById('rs-units').value = d.units || 'Metric';
+        document.getElementById('rs-pace-format').value = d.pace_format || 'min/km';
+
+        var gOn = !!d.garmin_connected;
+        document.getElementById('rs-garmin-dot').className = 'rs-dot ' + (gOn ? 'on' : 'off');
+        document.getElementById('rs-garmin-status').textContent = gOn ? 'Connected' : 'Not connected';
+        document.getElementById('rs-garmin-pw-hint').style.display = gOn ? 'inline' : 'none';
+
+        var sOn = !!d.strava_connected;
+        document.getElementById('rs-strava-dot').className = 'rs-dot ' + (sOn ? 'on' : 'off');
+        document.getElementById('rs-strava-status').textContent = sOn ? 'Connected' : 'Not connected';
+        document.getElementById('rs-strava-connect-btn').style.display = sOn ? 'none' : 'inline-block';
+        document.getElementById('rs-strava-disconnect-btn').style.display = sOn ? 'inline-block' : 'none';
+      });
+    }
+
+    function rsSaveGarmin() {
+      var payload = {garmin_email: document.getElementById('rs-garmin-email').value};
+      var pw = document.getElementById('rs-garmin-password').value;
+      if (pw) payload.garmin_password = pw;
+      rsApi('runningapp.running_journal.settings_api.save_my_settings', payload).then(function() {
+        document.getElementById('rs-garmin-password').value = '';
+        rsShowMsg('rs-garmin-msg', 'Saved.', true);
+        rsLoadSettings();
+      }).catch(function() { rsShowMsg('rs-garmin-msg', 'Save failed.', false); });
+    }
+
+    function rsSaveProfile() {
+      var payload = {
+        weight_kg: document.getElementById('rs-weight').value,
+        gender: document.getElementById('rs-gender').value,
+        date_of_birth: document.getElementById('rs-dob').value,
+        resting_heart_rate: document.getElementById('rs-resting-hr').value,
+        resting_hr: document.getElementById('rs-resting-hr').value,
+        units: document.getElementById('rs-units').value,
+        pace_format: document.getElementById('rs-pace-format').value
+      };
+      rsApi('runningapp.running_journal.settings_api.save_my_settings', payload).then(function() {
+        rsShowMsg('rs-profile-msg', 'Saved.', true);
+      }).catch(function() { rsShowMsg('rs-profile-msg', 'Save failed.', false); });
+    }
+
+    function rsConnectStrava() {
+      rsApi('runningapp.running_journal.strava_oauth.authorize_url').then(function(res) {
+        if (res.message) window.location.href = res.message;
+        else rsShowMsg('rs-strava-msg', 'Strava isn\'t set up on this site yet.', false);
+      });
+    }
+
+    function rsDisconnectStrava() {
+      rsApi('runningapp.running_journal.strava_oauth.disconnect').then(function() {
+        rsShowMsg('rs-strava-msg', 'Disconnected.', true);
+        rsLoadSettings();
+      });
+    }
+
+    function rsInvite() {
+      var email = document.getElementById('rs-invite-email').value;
+      if (!email) return;
+      rsApi('runningapp.running_journal.user_admin.invite_user', {email: email}).then(function(res) {
+        if (!res.message) { rsShowMsg('rs-invite-msg', 'Could not generate invite.', false); return; }
+        rsShowMsg('rs-invite-msg', res.message.created ? 'User created — send them this link:' : 'Existing user — send them this new link:', true);
+        var box = document.getElementById('rs-invite-link');
+        box.textContent = res.message.reset_link;
+        box.style.display = 'block';
+      }).catch(function() { rsShowMsg('rs-invite-msg', 'Could not generate invite.', false); });
+    }
+  </script>
+</body>
+</html>

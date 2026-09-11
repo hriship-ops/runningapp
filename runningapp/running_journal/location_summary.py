@@ -11,7 +11,7 @@ import time
 
 import frappe
 
-from runningapp.running_journal.strava_sync import get_location_details, first_latlon
+from runningapp.running_journal.strava_sync import get_location_details, first_latlon, current_user
 
 SETTINGS = "Run Settings"
 
@@ -93,10 +93,11 @@ def backfill_geo_fields():
     return {"updated": updated, "more_pending": remaining > 0, "remaining": remaining}
 
 
-def _distinct_geo():
+def _distinct_geo(user):
     rows = frappe.db.sql(
         """SELECT DISTINCT country, state, district FROM `tabRun`
-           WHERE country IS NOT NULL AND country != ''""",
+           WHERE country IS NOT NULL AND country != '' AND user = %s""",
+        (user,),
         as_dict=True,
     )
     countries = sorted({r.country for r in rows if r.country})
@@ -108,8 +109,9 @@ def _distinct_geo():
 @frappe.whitelist(allow_guest=True)
 def get_location_summary():
     """Countries/states/districts run in, with the actual lists for the
-    dashboard's drill-down cards."""
-    countries, states, districts = _distinct_geo()
+    dashboard's drill-down cards — scoped to the viewing user (or the
+    default public account's data for anonymous visitors)."""
+    countries, states, districts = _distinct_geo(current_user())
     return {
         "countries": countries,
         "states": states,

@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "creation": "2026-09-11 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "client_id",
+  "client_secret",
+  "info"
+ ],
+ "fields": [
+  {
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "Strava Client ID"
+  },
+  {
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Strava Client Secret"
+  },
+  {
+   "fieldname": "info",
+   "fieldtype": "HTML",
+   "options": "<p>One Strava API application shared by every user of this site. Each user's own \"Connect with Strava\" click authorizes <em>their</em> Strava account against this same client ID/secret via OAuth — individual users never see or need the secret.</p><p>Redirect URI to register with Strava: <code>&lt;site url&gt;/api/method/runningapp.running_journal.strava_oauth.callback</code></p>"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-11 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Running Journal",
+ "name": "Strava App Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

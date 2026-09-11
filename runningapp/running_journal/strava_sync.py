@@ -1,7 +1,11 @@
 """
 strava_sync.py
 --------------
-Strava sync for Running Journal.
+Strava sync for Running Journal. Multi-user: every user has their own
+Run Settings record (holding their own Strava tokens, Garmin
+credentials, and profile fields) and their own Strava OAuth connection
+via the shared app-level Strava App Settings (client_id/secret) —
+see strava_oauth.py for the actual "Connect with Strava" flow.
 
 For each new activity:
   1. List endpoint    → activity metadata
@@ -24,11 +28,37 @@ from datetime import datetime
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
 SETTINGS = "Run Settings"
+APP_SETTINGS = "Strava App Settings"
+
+# The original site owner's data, shown to anyone visiting the public
+# /run-journal page without logging in — preserves the pre-multi-user
+# behaviour for the primary account. Any *other* logged-in user only
+# ever sees their own data.
+DEFAULT_PUBLIC_USER = "hrishi.p@azimpremjifoundation.org"
+
+
+def current_user():
+    """The user whose data should be read/written for this request —
+    the logged-in user, or DEFAULT_PUBLIC_USER for anonymous viewers."""
+    u = frappe.session.user
+    return DEFAULT_PUBLIC_USER if u == "Guest" else u
+
+
+def ensure_settings_doc(user=None):
+    """Get-or-create this user's Run Settings record."""
+    user = user or current_user()
+    if frappe.db.exists(SETTINGS, user):
+        return frappe.get_doc(SETTINGS, user)
+    doc = frappe.get_doc({"doctype": SETTINGS, "user": user})
+    doc.insert(ignore_permissions=True)
+    return doc
 
 
 # ── Settings helpers ──────────────────────────────────────────────────────────
-def get_settings_value(field):
-    return frappe.db.get_single_value(SETTINGS, field)
+def get_settings_value(field, user=None):
+    user = user or current_user()
+    return frappe.db.get_value(SETTINGS, user, field)
+
 
 def compute_age(dob, activity_date):
     """Compute age at time of activity — not today's age."""
@@ -46,31 +76,39 @@ def compute_age(dob, activity_date):
     return max(1, age)
 
 
-def get_analytics_settings():
+def get_analytics_settings(user=None):
+    user = user or current_user()
     try:
-        dob = get_settings_value("date_of_birth")
+        dob = get_settings_value("date_of_birth", user)
         return {
-            "weight":     float(get_settings_value("weight_kg") or 70),
+            "weight":     float(get_settings_value("weight_kg", user) or 70),
             "dob":        dob or "1975-04-20",
-            "gender":     get_settings_value("gender") or "Male",
-            "resting_hr": int(get_settings_value("resting_hr") or 50),
-            "max_hr":     int(get_settings_value("max_hr_override") or 0),
+            "gender":     get_settings_value("gender", user) or "Male",
+            "resting_hr": int(get_settings_value("resting_hr", user) or 50),
+            "max_hr":     int(get_settings_value("max_hr_override", user) or 0),
         }
-    except:
+    except Exception:
         return {"weight": 70, "dob": "1975-04-20", "gender": "Male", "resting_hr": 50, "max_hr": 0}
 
 
+# ── App-level Strava OAuth credentials (shared by every user) ────────────────
+def strava_app_credentials():
+    client_id = frappe.db.get_single_value(APP_SETTINGS, "client_id")
+    client_secret = get_decrypted_password(APP_SETTINGS, APP_SETTINGS, "client_secret", raise_exception=False)
+    return client_id, client_secret
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
-def get_valid_access_token():
-    client_id    = get_settings_value("strava_client_id")
-    access_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_access_token")
+def get_valid_access_token(user=None):
+    user = user or current_user()
+    client_id, client_secret = strava_app_credentials()
+    access_token = get_decrypted_password(SETTINGS, user, "strava_access_token", raise_exception=False)
     test = requests.get(
         "https://www.strava.com/api/v3/athlete",
         headers={"Authorization": f"Bearer {access_token}"}
     )
     if test.status_code == 401:
-        client_secret = get_decrypted_password(SETTINGS, SETTINGS, "strava_client_secret")
-        refresh_token = get_decrypted_password(SETTINGS, SETTINGS, "strava_refresh_token")
+        refresh_token = get_decrypted_password(SETTINGS, user, "strava_refresh_token", raise_exception=False)
         r = requests.post("https://www.strava.com/oauth/token", data={
             "client_id":     client_id,
             "client_secret": client_secret,
@@ -78,16 +116,16 @@ def get_valid_access_token():
             "grant_type":    "refresh_token"
         })
         tokens = r.json()
-        set_encrypted_password(SETTINGS, SETTINGS, tokens["access_token"], "strava_access_token")
-        set_encrypted_password(SETTINGS, SETTINGS, tokens["refresh_token"], "strava_refresh_token")
+        set_encrypted_password(SETTINGS, user, tokens["access_token"], "strava_access_token")
+        set_encrypted_password(SETTINGS, user, tokens["refresh_token"], "strava_refresh_token")
         frappe.db.commit()
         return tokens["access_token"]
     return access_token
 
 
 # ── API fetchers ──────────────────────────────────────────────────────────────
-def fetch_activities(per_page=50, page=1):
-    token = get_valid_access_token()
+def fetch_activities(per_page=50, page=1, user=None):
+    token = get_valid_access_token(user)
     r = requests.get(
         "https://www.strava.com/api/v3/activities",
         headers={"Authorization": f"Bearer {token}"},
@@ -95,9 +133,9 @@ def fetch_activities(per_page=50, page=1):
     )
     return r.json()
 
-def fetch_activity_detail(activity_id):
+def fetch_activity_detail(activity_id, user=None):
     """Detail endpoint — returns real calories, gear, suffer_score, description."""
-    token = get_valid_access_token()
+    token = get_valid_access_token(user)
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}",
         headers={"Authorization": f"Bearer {token}"}
@@ -106,12 +144,12 @@ def fetch_activity_detail(activity_id):
         return r.json()
     return {}
 
-def fetch_activity_streams(activity_id):
+def fetch_activity_streams(activity_id, user=None):
     """
     Fetch all available stream keys — no artificial point cap.
     Returns per-point data for the full activity.
     """
-    token = get_valid_access_token()
+    token = get_valid_access_token(user)
     keys = "latlng,altitude,time,heartrate,cadence,watts,temp,grade_smooth,velocity_smooth,moving,distance"
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
@@ -296,12 +334,13 @@ TYPE_MAP = {
 
 
 # ── Main activity builder ─────────────────────────────────────────────────────
-def activity_to_run(activity, detail, streams, settings):
+def activity_to_run(activity, detail, streams, settings, user=None):
     """
     Build a Run doc dict from list + detail + streams data.
     detail overrides list for calories.
     FIT session data not available here — streams is our best source.
     """
+    user = user or current_user()
     activity_type = TYPE_MAP.get(activity.get("type", ""), "Run")
     distance_km   = round((activity.get("distance", 0) or 0) / 1000, 3)
     duration_sec  = activity.get("moving_time", 0) or 0
@@ -358,6 +397,7 @@ def activity_to_run(activity, detail, streams, settings):
 
     run_doc = {
         "doctype":            "Run",
+        "user":               user,
         "run_name":           run_name,
         "date":               start_date,
         "activity_type":      activity_type,
@@ -394,20 +434,21 @@ def activity_to_run(activity, detail, streams, settings):
 # ── Sync ──────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
 def sync_strava(full_sync=False):
-    settings = get_analytics_settings()
+    user = current_user()
+    settings = get_analytics_settings(user)
     imported = 0
     skipped  = 0
     page     = 1
 
     while True:
-        activities = fetch_activities(per_page=50, page=page)
+        activities = fetch_activities(per_page=50, page=page, user=user)
         if not activities or not isinstance(activities, list):
             break
 
         for activity in activities:
             strava_id = str(activity.get("id", ""))
 
-            if frappe.db.exists("Run", {"strava_id": strava_id}):
+            if frappe.db.exists("Run", {"strava_id": strava_id, "user": user}):
                 skipped += 1
                 continue
 
@@ -416,12 +457,12 @@ def sync_strava(full_sync=False):
                 continue
 
             # Fetch detail and streams for every new activity
-            detail  = fetch_activity_detail(activity["id"])
+            detail  = fetch_activity_detail(activity["id"], user=user)
             streams = {}
             if activity.get("start_latlng"):
-                streams = fetch_activity_streams(activity["id"])
+                streams = fetch_activity_streams(activity["id"], user=user)
 
-            run_data = activity_to_run(activity, detail, streams, settings)
+            run_data = activity_to_run(activity, detail, streams, settings, user=user)
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
             imported += 1
@@ -430,7 +471,7 @@ def sync_strava(full_sync=False):
             break
         page += 1
 
-    frappe.db.set_single_value(SETTINGS, "strava_last_sync", datetime.now())
+    frappe.db.set_value(SETTINGS, user, "strava_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped}
 

@@ -20,6 +20,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="rw-btn-import" id="rw-sync-btn" onclick="rwSyncStrava()" style="display:none">&#8635; Sync Garmin</button>
+        <a class="rw-btn-import" id="rw-settings-btn" href="/run-settings" style="display:none;background:#374151;text-decoration:none">&#9881; Settings</a>
         <button class="rw-btn-import" id="rw-login-btn" onclick="rwShowLogin()" style="background:#374151">&#128274; Login</button>
         <button class="rw-btn-import" id="rw-logout-btn" onclick="rwLogout()" style="display:none;background:#374151">&#128275; Logout</button>
       </div>
@@ -162,7 +163,7 @@
         <div class="rw-modal-body" style="padding:24px">
           <div style="margin-bottom:16px">
             <label style="display:block;color:#9ca3af;font-size:12px;margin-bottom:6px">Username</label>
-                          <input id="rw-login-user" type="text" value="hrishi.p@azimpremjifoundation.org"
+                          <input id="rw-login-user" type="text" placeholder="you@example.com"
               style="width:100%;box-sizing:border-box;background:#111827;border:1px solid #374151;color:#f1f5f9;padding:8px 12px;border-radius:6px;font-size:14px">
           </div>
           <div style="margin-bottom:24px">
@@ -190,6 +191,7 @@
         var user = data.message;
         if (user && user !== 'Guest') {
           document.getElementById('rw-sync-btn').style.display = '';
+          document.getElementById('rw-settings-btn').style.display = '';
           document.getElementById('rw-login-btn').style.display = 'none';
           document.getElementById('rw-logout-btn').style.display = '';
         }

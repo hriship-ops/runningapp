@@ -1,11 +1,13 @@
 {
  "actions": [],
- "allow_rename": 1,
+ "allow_rename": 0,
+ "autoname": "field:user",
  "creation": "2026-03-16 13:25:56.306111",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "user",
   "weight_kg",
   "age",
   "gender",
@@ -14,10 +16,10 @@
   "default_activity",
   "pace_format",
   "calories_formula",
-  "strava_client_id",
-  "strava_client_secret",
+  "strava_athlete_id",
   "strava_access_token",
   "strava_refresh_token",
+  "strava_token_expires",
   "strava_last_sync",
   "resting_hr",
   "max_hr_override",
@@ -28,6 +30,16 @@
   "garmin_sync_cursor"
  ],
  "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "User",
+   "unique": 1,
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
   {
    "fieldname": "weight_kg",
    "fieldtype": "Float",
@@ -74,24 +86,28 @@
    "options": "MET\nSimple"
   },
   {
-   "fieldname": "strava_client_id",
+   "fieldname": "strava_athlete_id",
    "fieldtype": "Data",
-   "label": "Strava Client ID"
-  },
-  {
-   "fieldname": "strava_client_secret",
-   "fieldtype": "Password",
-   "label": "Strava Client Secret"
+   "label": "Strava Athlete ID",
+   "read_only": 1
   },
   {
    "fieldname": "strava_access_token",
    "fieldtype": "Password",
-   "label": "Strava Access Token"
+   "label": "Strava Access Token",
+   "read_only": 1
   },
   {
    "fieldname": "strava_refresh_token",
    "fieldtype": "Password",
-   "label": "Strava Refresh Token"
+   "label": "Strava Refresh Token",
+   "read_only": 1
+  },
+  {
+   "fieldname": "strava_token_expires",
+   "fieldtype": "Datetime",
+   "label": "Strava Token Expires",
+   "read_only": 1
   },
   {
    "fieldname": "strava_last_sync",
@@ -137,7 +153,6 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "issingle": 1,
  "links": [],
  "modified": "2026-05-21 20:03:12.986011",
  "modified_by": "Administrator",
@@ -153,6 +168,14 @@
    "read": 1,
    "role": "System Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "if_owner": 1,
+   "read": 1,
+   "role": "All",
    "write": 1
   }
  ],

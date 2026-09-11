@@ -1,5 +1,6 @@
 import frappe, json
 from frappe.model.document import Document
+from runningapp.running_journal.strava_sync import current_user
 
 class Run(Document):
     pass
@@ -8,9 +9,11 @@ class Run(Document):
 def get_all_runs(filters=None):
     if filters and isinstance(filters, str):
         filters = json.loads(filters)
+    filters = list(filters or [])
+    filters.append(["user", "=", current_user()])
     return frappe.db.get_all(
         "Run",
-        filters=filters or [],
+        filters=filters,
         fields=["name","run_name","date","activity_type","location","country","state","district","distance_km","duration_sec","elevation_gain","calories","avg_heart_rate","max_heart_rate"],
         order_by="date desc",
         ignore_permissions=True
@@ -19,6 +22,8 @@ def get_all_runs(filters=None):
 @frappe.whitelist(allow_guest=True)
 def get_run(name):
     doc = frappe.get_doc("Run", name)
+    if doc.user and doc.user != current_user():
+        frappe.throw("Not found", frappe.DoesNotExistError)
     return {
         "name": doc.name,
         "run_name": doc.run_name,

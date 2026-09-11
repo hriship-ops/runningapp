@@ -19,6 +19,7 @@ synced via Strava (or manually backfilled) under a different source ID.
 """
 
 import os
+import re
 import json
 import gzip
 import time
@@ -37,6 +38,8 @@ from runningapp.running_journal.strava_sync import (
     compute_calories_met,
     compute_vdot,
     compute_trimp,
+    current_user,
+    ensure_settings_doc,
 )
 
 SETTINGS = "Run Settings"
@@ -64,20 +67,24 @@ GARMIN_TYPE_MAP = {
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
-def _token_dir():
-    path = frappe.get_site_path("private", "files", "garmin_tokens")
+def _token_dir(user):
+    # Per-user: two different Garmin accounts must never share a cached
+    # session, or one user's sync would silently start acting as the other.
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", user)
+    path = frappe.get_site_path("private", "files", "garmin_tokens", safe)
     os.makedirs(path, exist_ok=True)
     return path
 
 
-def get_garmin_client():
+def get_garmin_client(user=None):
     from garminconnect import Garmin
 
-    email = frappe.db.get_single_value(SETTINGS, "garmin_email")
-    password = get_decrypted_password(SETTINGS, SETTINGS, "garmin_password", raise_exception=False)
+    user = user or current_user()
+    email = frappe.db.get_value(SETTINGS, user, "garmin_email")
+    password = get_decrypted_password(SETTINGS, user, "garmin_password", raise_exception=False)
 
     client = Garmin(email=email, password=password)
-    client.login(tokenstore=_token_dir())
+    client.login(tokenstore=_token_dir(user))
     return client
 
 
@@ -155,10 +162,10 @@ def fetch_activity_route(client, activity_id):
 
 
 # ── Cross-source dedup ───────────────────────────────────────────────────────
-def _is_duplicate(activity_date, activity_type, distance_km, duration_sec):
+def _is_duplicate(activity_date, activity_type, distance_km, duration_sec, user):
     candidates = frappe.get_all(
         "Run",
-        filters={"date": activity_date, "activity_type": activity_type},
+        filters={"date": activity_date, "activity_type": activity_type, "user": user},
         fields=["name", "distance_km", "duration_sec"],
     )
     for c in candidates:
@@ -180,7 +187,7 @@ def _is_duplicate(activity_date, activity_type, distance_km, duration_sec):
 
 
 # ── Main activity builder ───────────────────────────────────────────────────
-def activity_to_run(activity, points, settings):
+def activity_to_run(activity, points, settings, user):
     type_key = (activity.get("activityType") or {}).get("typeKey", "")
     activity_type = GARMIN_TYPE_MAP.get(type_key, "Run")
     distance_km = round((activity.get("distance", 0) or 0) / 1000, 3)
@@ -236,6 +243,7 @@ def activity_to_run(activity, points, settings):
 
     run_doc = {
         "doctype": "Run",
+        "user": user,
         "run_name": run_name,
         "date": start_date,
         "activity_type": activity_type,
@@ -273,15 +281,17 @@ CURSOR_FIELD = "garmin_sync_cursor"
 
 @frappe.whitelist()
 def sync_garmin(full_sync=False):
-    client = get_garmin_client()
-    settings = get_analytics_settings()
+    user = current_user()
+    ensure_settings_doc(user)
+    client = get_garmin_client(user)
+    settings = get_analytics_settings(user)
     imported = 0
     skipped = 0
     # Resume from where the last (possibly time-boxed) call left off, instead
     # of rescanning the whole history from the most recent activity every
     # time — on a large backlog that rescan cost grows every call and starts
     # eating the entire time budget before reaching any new activities.
-    start = int(frappe.db.get_single_value(SETTINGS, CURSOR_FIELD) or 0)
+    start = int(frappe.db.get_value(SETTINGS, user, CURSOR_FIELD) or 0)
     t_start = time.monotonic()
     more_pending = False
 
@@ -300,7 +310,7 @@ def sync_garmin(full_sync=False):
                 break
 
             garmin_id = str(activity.get("activityId", ""))
-            if not garmin_id or frappe.db.exists("Run", {"garmin_id": garmin_id}):
+            if not garmin_id or frappe.db.exists("Run", {"garmin_id": garmin_id, "user": user}):
                 skipped += 1
                 continue
 
@@ -314,7 +324,7 @@ def sync_garmin(full_sync=False):
             duration_sec = round(activity.get("duration", 0) or 0)
             start_date = (activity.get("startTimeLocal", "") or "")[:10]
 
-            if _is_duplicate(start_date, activity_type, distance_km, duration_sec):
+            if _is_duplicate(start_date, activity_type, distance_km, duration_sec, user):
                 skipped += 1
                 continue
 
@@ -325,7 +335,7 @@ def sync_garmin(full_sync=False):
             # by simply not showing a map.
             points = fetch_activity_route(client, garmin_id)
 
-            run_data = activity_to_run(activity, points, settings)
+            run_data = activity_to_run(activity, points, settings, user)
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
             imported += 1
@@ -340,13 +350,13 @@ def sync_garmin(full_sync=False):
 
     if more_pending:
         # Save the resume point for the next call.
-        frappe.db.set_single_value(SETTINGS, CURSOR_FIELD, start)
+        frappe.db.set_value(SETTINGS, user, CURSOR_FIELD, start)
     else:
         # Reached the end of Garmin's history — reset so the next sync
         # (periodic, catching new activities) starts from the most recent
         # activity again instead of resuming from the tail forever.
-        frappe.db.set_single_value(SETTINGS, CURSOR_FIELD, 0)
-        frappe.db.set_single_value(SETTINGS, "garmin_last_sync", datetime.now())
+        frappe.db.set_value(SETTINGS, user, CURSOR_FIELD, 0)
+        frappe.db.set_value(SETTINGS, user, "garmin_last_sync", datetime.now())
     frappe.db.commit()
     return {"imported": imported, "skipped": skipped, "more_pending": more_pending}
 
