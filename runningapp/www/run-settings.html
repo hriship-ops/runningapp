@@ -131,6 +131,33 @@
         <div class="rs-msg" id="rs-profile-msg"></div>
       </div>
 
+      <!-- BULK IMPORT -->
+      <div class="rs-card">
+        <div class="rs-card-title">Bulk Import</div>
+        <div class="rs-card-sub">Already have your history as files? Import it directly instead of syncing — no Garmin/Strava login needed.</div>
+
+        <div class="rs-field">
+          <label class="rs-label">Strava export (.zip from Settings &rsaquo; My Account &rsaquo; Download or Delete Your Account &rsaquo; Request Your Archive)</label>
+          <input class="rs-input" id="rs-strava-zip" type="file" accept=".zip">
+          <button class="rs-btn" style="margin-top:10px" onclick="rsImportStravaZip()">Import</button>
+        </div>
+
+        <div class="rs-field" style="margin-top:20px">
+          <label class="rs-label">Loose TCX / FIT / GPX files (e.g. Garmin "Export Original")</label>
+          <input class="rs-input" id="rs-loose-files" type="file" accept=".tcx,.fit,.gpx,.gz" multiple>
+          <select class="rs-select" id="rs-loose-type" style="margin-top:8px">
+            <option value="Run">Run</option>
+            <option value="Walk">Walk</option>
+            <option value="Swimming">Swimming</option>
+            <option value="Cycling">Cycling</option>
+          </select>
+          <button class="rs-btn" style="margin-top:10px" onclick="rsImportLooseFiles()">Import</button>
+        </div>
+
+        <div id="rs-import-progress" style="display:none;color:#9ca3af;font-size:13px;margin-top:12px">Importing&hellip; this can take a while for a large history, don't close this tab.</div>
+        <div class="rs-msg" id="rs-import-msg"></div>
+      </div>
+
       <!-- INVITE (owner only) -->
       <div class="rs-card" id="rs-invite-card" style="display:none">
         <div class="rs-card-title">Invite someone</div>
@@ -253,6 +280,56 @@
       rsApi('runningapp.running_journal.strava_oauth.disconnect').then(function() {
         rsShowMsg('rs-strava-msg', 'Disconnected.', true);
         rsLoadSettings();
+      });
+    }
+
+    function rsUploadFile(file) {
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('is_private', 1);
+      return fetch('/api/method/upload_file', {
+        method: 'POST',
+        headers: {'X-Frappe-CSRF-Token': RS_CSRF},
+        body: fd
+      }).then(function(r) { return r.json(); }).then(function(res) { return res.message.file_url; });
+    }
+
+    function rsImportStravaZip() {
+      var input = document.getElementById('rs-strava-zip');
+      var file = input.files[0];
+      if (!file) return;
+      document.getElementById('rs-import-progress').style.display = 'block';
+      rsUploadFile(file).then(function(file_url) {
+        return rsApi('runningapp.running_journal.bulk_import.import_strava_export', {file_url: file_url});
+      }).then(function(res) {
+        document.getElementById('rs-import-progress').style.display = 'none';
+        var r = res.message || {};
+        if (res.exc) { rsShowMsg('rs-import-msg', 'Import failed — check it\'s a genuine Strava export zip.', false); return; }
+        rsShowMsg('rs-import-msg', 'Imported ' + r.imported + ', skipped ' + r.skipped + ' (already had them), ' + r.errors + ' errors' + (r.no_file ? ', ' + r.no_file + ' had no matching file' : '') + '.', true);
+      }).catch(function() {
+        document.getElementById('rs-import-progress').style.display = 'none';
+        rsShowMsg('rs-import-msg', 'Import failed.', false);
+      });
+    }
+
+    function rsImportLooseFiles() {
+      var input = document.getElementById('rs-loose-files');
+      var files = Array.prototype.slice.call(input.files);
+      if (!files.length) return;
+      var activityType = document.getElementById('rs-loose-type').value;
+      document.getElementById('rs-import-progress').style.display = 'block';
+      Promise.all(files.map(rsUploadFile)).then(function(file_urls) {
+        return rsApi('runningapp.running_journal.bulk_import.import_activity_files', {
+          file_urls: JSON.stringify(file_urls), activity_type: activityType
+        });
+      }).then(function(res) {
+        document.getElementById('rs-import-progress').style.display = 'none';
+        var r = res.message || {};
+        if (res.exc) { rsShowMsg('rs-import-msg', 'Import failed.', false); return; }
+        rsShowMsg('rs-import-msg', 'Imported ' + r.imported + ', skipped ' + r.skipped + ' (duplicates), ' + r.errors + ' errors.', true);
+      }).catch(function() {
+        document.getElementById('rs-import-progress').style.display = 'none';
+        rsShowMsg('rs-import-msg', 'Import failed.', false);
       });
     }
 

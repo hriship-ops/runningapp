@@ -10,6 +10,7 @@ dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
     "garminconnect>=0.2.0",
+    "fitparse>=1.2.0",
 ]
 
 [build-system]
