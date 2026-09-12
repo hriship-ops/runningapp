@@ -11,7 +11,7 @@ import time
 
 import frappe
 
-from runningapp.running_journal.strava_sync import get_location_details, first_latlon, current_user
+from runningapp.running_journal.strava_sync import get_location_details, first_latlon, current_user, home_location
 
 SETTINGS = "Run Settings"
 
@@ -145,6 +145,40 @@ def reset_bad_geo_data():
     frappe.db.commit()
     remaining = _pending_geo_count()
     return {"reset": frappe.db.sql("SELECT ROW_COUNT()")[0][0], "now_pending": remaining}
+
+
+def backfill_home_location_for_no_gps(user=None):
+    """One-off: runs with no GPS at all (country == '' — the sentinel
+    backfill_geo_fields() uses for "checked, no fix anywhere in the whole
+    route") predate the home_location() fallback added to the live
+    Garmin/Strava sync and bulk import, so pool swims/treadmill/gym
+    sessions synced before that fix are still sitting with no country/
+    state/district — silently excluded from the location drill-down
+    cards forever instead of counting toward wherever the athlete
+    actually lives. Retags each with that user's own most-common
+    already-geocoded location. Pass `user` to limit to one person;
+    omit to backfill everyone."""
+    filters = {"country": ""}
+    if user:
+        filters["user"] = user
+    runs = frappe.db.get_all("Run", filters=filters, fields=["name", "user"])
+
+    updated = 0
+    home_by_user = {}
+    for run in runs:
+        if run.user not in home_by_user:
+            home_by_user[run.user] = home_location(run.user)
+        home = home_by_user[run.user]
+        if not home:
+            continue
+        frappe.db.set_value(
+            "Run", run.name,
+            {"country": home["country"], "state": home["state"], "district": home["district"]},
+            update_modified=False,
+        )
+        updated += 1
+    frappe.db.commit()
+    return {"updated": updated, "checked": len(runs)}
 
 
 def reset_recoverable_geo_data():

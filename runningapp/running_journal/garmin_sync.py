@@ -34,6 +34,7 @@ from runningapp.running_journal.strava_sync import (
     compute_age,
     get_location_details,
     first_latlon,
+    home_location,
     compute_calories_keytel,
     compute_calories_met,
     compute_vdot,
@@ -224,6 +225,11 @@ def activity_to_run(activity, points, settings, user):
             geo = details
         except Exception:
             pass
+    else:
+        # No GPS at all (pool swim, treadmill, gym) — tag with the
+        # athlete's own most-common location instead of leaving this run
+        # out of the country/state/district drill-down entirely.
+        geo = home_location(user)
 
     calories = int(activity.get("calories", 0) or 0)
     calorie_source = "garmin" if calories > 0 else ""

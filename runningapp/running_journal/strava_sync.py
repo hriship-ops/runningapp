@@ -211,6 +211,30 @@ def first_latlon(points):
     return None
 
 
+def home_location(user):
+    """Best-guess "home" for an activity with no GPS at all — a pool swim,
+    treadmill run, or gym session. These aren't "nowhere", they're
+    wherever the athlete actually lives; leaving them out of country/
+    state/district meant they silently vanished from the location
+    drill-down cards forever instead of counting toward the athlete's
+    own country/state/district like every GPS-tagged run does. The most
+    common already-geocoded district (not the most recent run) is the
+    better guess — a one-off trip shouldn't get treadmill sessions
+    wrongly tagged to it just because it happened to be the last GPS fix
+    on file."""
+    row = frappe.db.sql(
+        """SELECT country, state, district, COUNT(*) AS c
+           FROM `tabRun`
+           WHERE user = %s AND country IS NOT NULL AND country != ''
+           GROUP BY country, state, district
+           ORDER BY c DESC LIMIT 1""",
+        (user,), as_dict=True,
+    )
+    if not row:
+        return None
+    return {"country": row[0].country, "state": row[0].state, "district": row[0].district}
+
+
 # ── Analytics formulae ────────────────────────────────────────────────────────
 def compute_calories_keytel(avg_hr, duration_sec, weight, age, gender):
     """
@@ -368,6 +392,11 @@ def activity_to_run(activity, detail, streams, settings, user=None):
             geo = details
         except Exception:
             pass
+    else:
+        # No GPS at all (pool swim, treadmill, gym) — tag with the
+        # athlete's own most-common location instead of leaving this run
+        # out of the country/state/district drill-down entirely.
+        geo = home_location(user)
 
     # Calories — detail endpoint first, then Keytel, then MET
     calories       = int(detail.get("calories", 0) or 0)

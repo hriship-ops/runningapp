@@ -44,6 +44,7 @@ from runningapp.running_journal.strava_sync import (
     compute_trimp,
     first_latlon,
     get_location_details,
+    home_location,
 )
 from runningapp.running_journal.garmin_sync import _is_duplicate
 
@@ -293,6 +294,11 @@ def _build_run_doc(user, settings, activity_type, date, run_name, distance_km, d
             pass
         finally:
             time.sleep(1)
+    else:
+        # No GPS at all (pool swim, treadmill, gym) — tag with the
+        # athlete's own most-common location instead of leaving this run
+        # out of the country/state/district drill-down entirely.
+        geo = home_location(user)
 
     doc = {
         "doctype": "Run",
