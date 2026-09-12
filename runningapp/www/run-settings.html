@@ -211,6 +211,17 @@
         }
         rsLoadSettings();
 
+        // Resume watching an import already in flight (e.g. page was
+        // reloaded partway through) — the background job keeps running
+        // either way, this just reconnects the UI to it.
+        rsApi('runningapp.running_journal.bulk_import.get_import_progress').then(function(res) {
+          var p = res.message || {state: 'idle'};
+          if (p.state === 'queued' || p.state === 'running') {
+            rsRenderImportProgress(p);
+            rsPollImportProgress('');
+          }
+        });
+
         var params = new URLSearchParams(location.search);
         var strava = params.get('strava');
         if (strava === 'connected') rsShowMsg('rs-strava-msg', 'Strava connected!', true);
@@ -294,18 +305,54 @@
       }).then(function(r) { return r.json(); }).then(function(res) { return res.message.file_url; });
     }
 
+    var rsImportPollTimer = null;
+
+    function rsRenderImportProgress(p) {
+      var box = document.getElementById('rs-import-progress');
+      box.style.display = 'block';
+      if (p.state === 'queued') {
+        box.textContent = 'Queued…';
+      } else if (p.state === 'running') {
+        box.textContent = 'Importing ' + p.processed + ' / ' + p.total + '… (' + p.imported + ' imported so far). Safe to close this tab — it keeps going on the server.';
+      }
+    }
+
+    function rsPollImportProgress(doneMsgPrefix) {
+      if (rsImportPollTimer) clearInterval(rsImportPollTimer);
+      rsImportPollTimer = setInterval(function() {
+        rsApi('runningapp.running_journal.bulk_import.get_import_progress').then(function(res) {
+          var p = res.message || {state: 'idle'};
+          if (p.state === 'queued' || p.state === 'running') {
+            rsRenderImportProgress(p);
+          } else if (p.state === 'done') {
+            clearInterval(rsImportPollTimer);
+            document.getElementById('rs-import-progress').style.display = 'none';
+            rsShowMsg('rs-import-msg', doneMsgPrefix + 'imported ' + p.imported + ', skipped ' + p.skipped +
+              ' (duplicates), ' + p.errors + ' errors' + (p.no_file ? ', ' + p.no_file + ' had no matching file' : '') + '.', true);
+          } else if (p.state === 'error') {
+            clearInterval(rsImportPollTimer);
+            document.getElementById('rs-import-progress').style.display = 'none';
+            rsShowMsg('rs-import-msg', p.message || 'Import failed.', false);
+          }
+        });
+      }, 2500);
+    }
+
     function rsImportStravaZip() {
       var input = document.getElementById('rs-strava-zip');
       var file = input.files[0];
       if (!file) return;
       document.getElementById('rs-import-progress').style.display = 'block';
+      document.getElementById('rs-import-progress').textContent = 'Uploading…';
       rsUploadFile(file).then(function(file_url) {
         return rsApi('runningapp.running_journal.bulk_import.import_strava_export', {file_url: file_url});
       }).then(function(res) {
-        document.getElementById('rs-import-progress').style.display = 'none';
-        var r = res.message || {};
-        if (res.exc) { rsShowMsg('rs-import-msg', 'Import failed — check it\'s a genuine Strava export zip.', false); return; }
-        rsShowMsg('rs-import-msg', 'Imported ' + r.imported + ', skipped ' + r.skipped + ' (already had them), ' + r.errors + ' errors' + (r.no_file ? ', ' + r.no_file + ' had no matching file' : '') + '.', true);
+        if (res.exc) {
+          document.getElementById('rs-import-progress').style.display = 'none';
+          rsShowMsg('rs-import-msg', 'Import failed — check it\'s a genuine Strava export zip.', false);
+          return;
+        }
+        rsPollImportProgress('');
       }).catch(function() {
         document.getElementById('rs-import-progress').style.display = 'none';
         rsShowMsg('rs-import-msg', 'Import failed.', false);
@@ -318,15 +365,18 @@
       if (!files.length) return;
       var activityType = document.getElementById('rs-loose-type').value;
       document.getElementById('rs-import-progress').style.display = 'block';
+      document.getElementById('rs-import-progress').textContent = 'Uploading…';
       Promise.all(files.map(rsUploadFile)).then(function(file_urls) {
         return rsApi('runningapp.running_journal.bulk_import.import_activity_files', {
           file_urls: JSON.stringify(file_urls), activity_type: activityType
         });
       }).then(function(res) {
-        document.getElementById('rs-import-progress').style.display = 'none';
-        var r = res.message || {};
-        if (res.exc) { rsShowMsg('rs-import-msg', 'Import failed.', false); return; }
-        rsShowMsg('rs-import-msg', 'Imported ' + r.imported + ', skipped ' + r.skipped + ' (duplicates), ' + r.errors + ' errors.', true);
+        if (res.exc) {
+          document.getElementById('rs-import-progress').style.display = 'none';
+          rsShowMsg('rs-import-msg', 'Import failed.', false);
+          return;
+        }
+        rsPollImportProgress('');
       }).catch(function() {
         document.getElementById('rs-import-progress').style.display = 'none';
         rsShowMsg('rs-import-msg', 'Import failed.', false);

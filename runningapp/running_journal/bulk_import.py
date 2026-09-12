@@ -26,6 +26,7 @@ import json
 import math
 import os
 import re
+import shutil
 import time
 import zipfile
 import xml.etree.ElementTree as ET
@@ -52,6 +53,32 @@ TYPE_MAP = {
     "Ride": "Cycling", "VirtualRide": "Cycling", "Cycling": "Cycling",
     "Walk": "Walk", "Hike": "Walk",
 }
+
+# ── Progress tracking ────────────────────────────────────────────────────────
+# A real history export can be thousands of files — well past gunicorn's
+# ~120s request timeout and nginx's matching proxy_read_timeout — so both
+# import entry points below only extract/validate synchronously and hand
+# the actual per-file work to a background job via frappe.enqueue(), which
+# runs on queue-long with no such deadline. Progress is written to the
+# cache (not the DB — this is throwaway, high-frequency, one-per-user
+# status, not data worth a table) so the settings page can poll it instead
+# of ever needing to guess whether an upload silently died mid-request.
+IMPORT_PROGRESS_TTL = 3600
+
+
+def _progress_key(user):
+    return f"bulk_import_progress:{user}"
+
+
+def _set_progress(user, **kwargs):
+    frappe.cache().set_value(_progress_key(user), json.dumps(kwargs), expires_in_sec=IMPORT_PROGRESS_TTL)
+
+
+@frappe.whitelist()
+def get_import_progress(user=None):
+    user = user or current_user()
+    raw = frappe.cache().get_value(_progress_key(user))
+    return json.loads(raw) if raw else {"state": "idle"}
 
 
 # ── File-level parsers ───────────────────────────────────────────────────────
@@ -355,9 +382,13 @@ def import_strava_export(file_url=None, extracted_dir=None, user=None):
     extracted_dir: an alternative to file_url — a path on the server that
     already has activities.csv + an activities/ folder, for a bench-execute
     run against files placed there directly instead of through the UI.
+
+    Only unzips and validates here, synchronously — the actual import runs
+    as a background job (see _run_strava_export_job) so a large history
+    can't be cut off mid-way by the request timeout. Poll
+    get_import_progress() for status.
     """
     user = user or current_user()
-    settings = get_analytics_settings(user)
 
     if file_url and not extracted_dir:
         extracted_dir = _extract_zip(file_url, user)
@@ -365,88 +396,115 @@ def import_strava_export(file_url=None, extracted_dir=None, user=None):
         frappe.throw("Provide either file_url (an uploaded Strava export zip) or extracted_dir")
 
     csv_path = os.path.join(extracted_dir, "activities.csv")
-    activities_dir = os.path.join(extracted_dir, "activities")
     if not os.path.exists(csv_path):
         frappe.throw("activities.csv not found in that export — is this a genuine Strava bulk-export zip?")
 
-    imported = skipped = errors = no_file = 0
+    _set_progress(user, state="queued", imported=0, skipped=0, errors=0, no_file=0, total=0, processed=0)
+    frappe.enqueue(
+        "runningapp.running_journal.bulk_import._run_strava_export_job",
+        queue="long", timeout=3600, job_name=f"strava-export-import-{user}",
+        extracted_dir=extracted_dir, user=user,
+    )
+    return {"queued": True}
+
+
+def _run_strava_export_job(extracted_dir, user):
+    settings = get_analytics_settings(user)
+    csv_path = os.path.join(extracted_dir, "activities.csv")
+    activities_dir = os.path.join(extracted_dir, "activities")
+
     with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        next(reader, None)
+        rows = list(csv.reader(f))
+    rows = rows[1:] if rows else []  # drop header
+    total = len(rows)
 
-        for row in reader:
-            if not row or not row[0].strip():
-                continue
-            activity_id = _g(row, _C_ID)
-            if not activity_id:
-                continue
-            if frappe.db.exists("Run", {"strava_id": activity_id, "user": user}):
-                skipped += 1
-                continue
+    imported = skipped = errors = no_file = 0
+    _set_progress(user, state="running", imported=0, skipped=0, errors=0, no_file=0, total=total, processed=0)
 
+    for i, row in enumerate(rows):
+        if not row or not row[0].strip():
+            continue
+        activity_id = _g(row, _C_ID)
+        if activity_id and frappe.db.exists("Run", {"strava_id": activity_id, "user": user}):
+            skipped += 1
+        else:
             activity_type = TYPE_MAP.get(_g(row, 3), "")
-            if not activity_type:
+            if not activity_id or not activity_type:
                 skipped += 1
-                continue
+            else:
+                try:
+                    date = _parse_csv_date(_g(row, _C_DATE))
+                    run_name = _g(row, _C_NAME) or f"{activity_type} {date}"
+                    notes = _g(row, _C_DESC)
+                    gear = _g(row, _C_GEAR) or _g(row, _C_ACTIVITY_GEAR)
 
-            try:
-                date = _parse_csv_date(_g(row, _C_DATE))
-                run_name = _g(row, _C_NAME) or f"{activity_type} {date}"
-                notes = _g(row, _C_DESC)
-                gear = _g(row, _C_GEAR) or _g(row, _C_ACTIVITY_GEAR)
+                    csv_distance_km = round(_sf(_g(row, _C_DISTANCE)) / 1000, 3)
+                    csv_duration = _si(_g(row, _C_MOVING_TIME))
+                    csv_calories = _si(_g(row, _C_CALORIES))
+                    csv_avg_hr = _si(_g(row, _C_AVG_HR))
+                    csv_max_hr = _si(_g(row, _C_MAX_HR))
 
-                csv_distance_km = round(_sf(_g(row, _C_DISTANCE)) / 1000, 3)
-                csv_duration = _si(_g(row, _C_MOVING_TIME))
-                csv_calories = _si(_g(row, _C_CALORIES))
-                csv_avg_hr = _si(_g(row, _C_AVG_HR))
-                csv_max_hr = _si(_g(row, _C_MAX_HR))
+                    filepath = _find_activity_file(activities_dir, _g(row, _C_FILENAME))
+                    fit_summary, route_points = {}, []
+                    if filepath:
+                        fit_summary, route_points, _ = _parse_activity_file(filepath)
+                    else:
+                        no_file += 1
 
-                filepath = _find_activity_file(activities_dir, _g(row, _C_FILENAME))
-                fit_summary, route_points = {}, []
-                if filepath:
-                    fit_summary, route_points, _ = _parse_activity_file(filepath)
-                else:
-                    no_file += 1
+                    def fv(key, csv_val, cast=float):
+                        v = fit_summary.get(key)
+                        return cast(v) if v is not None else csv_val
 
-                def fv(key, csv_val, cast=float):
-                    v = fit_summary.get(key)
-                    return cast(v) if v is not None else csv_val
+                    distance_km = round(float(fit_summary["total_distance"]) / 1000, 3) if fit_summary.get("total_distance") else csv_distance_km
+                    duration_sec = fv("total_moving_time", csv_duration) or fv("total_timer_time", csv_duration)
+                    elev_gain = fv("total_ascent", _sf(_g(row, _C_ELEV_GAIN)))
+                    avg_hr = int(fv("avg_heart_rate", csv_avg_hr))
+                    max_hr_val = int(fv("max_heart_rate", csv_max_hr))
+                    avg_speed = fv("enhanced_avg_speed", _sf(_g(row, _C_AVG_SPEED))) or fv("avg_speed", _sf(_g(row, _C_AVG_SPEED)))
+                    max_speed = fv("enhanced_max_speed", _sf(_g(row, _C_MAX_SPEED))) or fv("max_speed", _sf(_g(row, _C_MAX_SPEED)))
 
-                distance_km = round(float(fit_summary["total_distance"]) / 1000, 3) if fit_summary.get("total_distance") else csv_distance_km
-                duration_sec = fv("total_moving_time", csv_duration) or fv("total_timer_time", csv_duration)
-                elev_gain = fv("total_ascent", _sf(_g(row, _C_ELEV_GAIN)))
-                avg_hr = int(fv("avg_heart_rate", csv_avg_hr))
-                max_hr_val = int(fv("max_heart_rate", csv_max_hr))
-                avg_speed = fv("enhanced_avg_speed", _sf(_g(row, _C_AVG_SPEED))) or fv("avg_speed", _sf(_g(row, _C_AVG_SPEED)))
-                max_speed = fv("enhanced_max_speed", _sf(_g(row, _C_MAX_SPEED))) or fv("max_speed", _sf(_g(row, _C_MAX_SPEED)))
+                    fit_calories = int(fit_summary.get("total_calories", 0) or 0)
+                    calories = fit_calories or csv_calories
+                    calorie_source = "fit_session" if fit_calories else ("csv_strava" if csv_calories else "")
 
-                fit_calories = int(fit_summary.get("total_calories", 0) or 0)
-                calories = fit_calories or csv_calories
-                calorie_source = "fit_session" if fit_calories else ("csv_strava" if csv_calories else "")
+                    if _is_duplicate(date, activity_type, distance_km, duration_sec, user):
+                        skipped += 1
+                    else:
+                        run_doc = _build_run_doc(
+                            user, settings, activity_type, date, run_name, distance_km, duration_sec,
+                            elev_gain=elev_gain, avg_hr=avg_hr, max_hr_val=max_hr_val,
+                            avg_speed=avg_speed, max_speed=max_speed, calories=calories,
+                            calorie_source=calorie_source, route_points=route_points,
+                            strava_id=activity_id, notes=notes, gear=gear,
+                            extra={"relative_effort": _sf(_g(row, _C_REL_EFFORT))},
+                        )
+                        run = frappe.get_doc(run_doc)
+                        run.insert(ignore_permissions=True)
+                        imported += 1
+                except Exception:
+                    errors += 1
 
-                if _is_duplicate(date, activity_type, distance_km, duration_sec, user):
-                    skipped += 1
-                    continue
+        # Committing (and checkpointing progress) periodically rather than
+        # once at the end means a worker restart/crash partway through a
+        # multi-thousand-row import loses at most a few rows of progress,
+        # not the whole run — and the UI shows real movement instead of
+        # sitting at 0% for however long the full import takes.
+        if (i + 1) % 20 == 0 or i == total - 1:
+            frappe.db.commit()
+            _set_progress(
+                user, state="running", imported=imported, skipped=skipped,
+                errors=errors, no_file=no_file, total=total, processed=i + 1,
+            )
 
-                run_doc = _build_run_doc(
-                    user, settings, activity_type, date, run_name, distance_km, duration_sec,
-                    elev_gain=elev_gain, avg_hr=avg_hr, max_hr_val=max_hr_val,
-                    avg_speed=avg_speed, max_speed=max_speed, calories=calories,
-                    calorie_source=calorie_source, route_points=route_points,
-                    strava_id=activity_id, notes=notes, gear=gear,
-                    extra={"relative_effort": _sf(_g(row, _C_REL_EFFORT))},
-                )
-                run = frappe.get_doc(run_doc)
-                run.insert(ignore_permissions=True)
-                imported += 1
-                if imported % 50 == 0:
-                    frappe.db.commit()
-            except Exception:
-                errors += 1
-                continue
+    try:
+        shutil.rmtree(extracted_dir, ignore_errors=True)
+    except Exception:
+        pass
 
-    frappe.db.commit()
-    return {"imported": imported, "skipped": skipped, "errors": errors, "no_file": no_file}
+    _set_progress(
+        user, state="done", imported=imported, skipped=skipped,
+        errors=errors, no_file=no_file, total=total, processed=total,
+    )
 
 
 @frappe.whitelist()
@@ -458,50 +516,74 @@ def import_activity_files(file_urls=None, activity_type=None, user=None):
     single value applied to every file in this call, since none of these
     formats reliably say what kind of activity it was; call once per
     activity type if a batch has a mix of runs and swims, say.
+
+    Only validates/queues here — see import_strava_export's docstring for
+    why this runs as a background job instead of inline. Poll
+    get_import_progress() for status.
     """
     user = user or current_user()
-    settings = get_analytics_settings(user)
     if isinstance(file_urls, str):
         file_urls = json.loads(file_urls)
+    if not file_urls:
+        frappe.throw("No files given")
     activity_type = activity_type or "Run"
 
+    _set_progress(user, state="queued", imported=0, skipped=0, errors=0, total=len(file_urls), processed=0)
+    frappe.enqueue(
+        "runningapp.running_journal.bulk_import._run_activity_files_job",
+        queue="long", timeout=3600, job_name=f"activity-files-import-{user}",
+        file_urls=file_urls, activity_type=activity_type, user=user,
+    )
+    return {"queued": True}
+
+
+def _run_activity_files_job(file_urls, activity_type, user):
+    settings = get_analytics_settings(user)
+    total = len(file_urls)
     imported = skipped = errors = 0
-    for file_url in file_urls or []:
+    _set_progress(user, state="running", imported=0, skipped=0, errors=0, total=total, processed=0)
+
+    for i, file_url in enumerate(file_urls):
         try:
             filepath = _file_url_to_path(file_url)
             summary, route_points, start_ts = _parse_activity_file(filepath)
             if not route_points:
                 errors += 1
-                continue
+            else:
+                distance_m = float(summary.get("total_distance", 0) or 0)
+                distance_km = round(distance_m / 1000, 3) if distance_m else _distance_km_from_points(route_points)
+                duration_sec = round(
+                    float(summary.get("total_moving_time") or summary.get("total_timer_time") or 0)
+                    or (route_points[-1].get("t", 0) if route_points else 0)
+                )
+                date = (start_ts or datetime.now()).strftime("%Y-%m-%d")
+                run_name = f"{activity_type} {date}"
 
-            distance_m = float(summary.get("total_distance", 0) or 0)
-            distance_km = round(distance_m / 1000, 3) if distance_m else _distance_km_from_points(route_points)
-            duration_sec = round(
-                float(summary.get("total_moving_time") or summary.get("total_timer_time") or 0)
-                or (route_points[-1].get("t", 0) if route_points else 0)
-            )
-            date = (start_ts or datetime.now()).strftime("%Y-%m-%d")
-            run_name = f"{activity_type} {date}"
+                avg_hr = int(summary.get("avg_heart_rate", 0) or 0)
+                max_hr_val = int(summary.get("max_heart_rate", 0) or 0)
+                elev_gain = round(float(summary.get("total_ascent", 0) or 0))
 
-            avg_hr = int(summary.get("avg_heart_rate", 0) or 0)
-            max_hr_val = int(summary.get("max_heart_rate", 0) or 0)
-            elev_gain = round(float(summary.get("total_ascent", 0) or 0))
-
-            if _is_duplicate(date, activity_type, distance_km, duration_sec, user):
-                skipped += 1
-                continue
-
-            run_doc = _build_run_doc(
-                user, settings, activity_type, date, run_name, distance_km, duration_sec,
-                elev_gain=elev_gain, avg_hr=avg_hr, max_hr_val=max_hr_val,
-                route_points=route_points,
-            )
-            run = frappe.get_doc(run_doc)
-            run.insert(ignore_permissions=True)
-            imported += 1
-            frappe.db.commit()
+                if _is_duplicate(date, activity_type, distance_km, duration_sec, user):
+                    skipped += 1
+                else:
+                    run_doc = _build_run_doc(
+                        user, settings, activity_type, date, run_name, distance_km, duration_sec,
+                        elev_gain=elev_gain, avg_hr=avg_hr, max_hr_val=max_hr_val,
+                        route_points=route_points,
+                    )
+                    run = frappe.get_doc(run_doc)
+                    run.insert(ignore_permissions=True)
+                    imported += 1
         except Exception:
             errors += 1
-            continue
 
-    return {"imported": imported, "skipped": skipped, "errors": errors}
+        frappe.db.commit()
+        _set_progress(
+            user, state="running", imported=imported, skipped=skipped,
+            errors=errors, total=total, processed=i + 1,
+        )
+
+    _set_progress(
+        user, state="done", imported=imported, skipped=skipped,
+        errors=errors, total=total, processed=total,
+    )
