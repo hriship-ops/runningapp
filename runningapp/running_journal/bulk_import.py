@@ -26,7 +26,6 @@ import json
 import math
 import os
 import re
-import shutil
 import time
 import zipfile
 import xml.etree.ElementTree as ET
@@ -528,10 +527,13 @@ def _run_strava_export_job(extracted_dir, user):
                 errors=errors, no_file=no_file, total=total, processed=i + 1,
             )
 
-    try:
-        shutil.rmtree(extracted_dir, ignore_errors=True)
-    except Exception:
-        pass
+    # Deliberately NOT deleting extracted_dir: today's parser only pulls a
+    # fixed subset of fields out of each FIT/TCX/GPX file (lat/lon/ele/
+    # time/HR/speed/distance) even though a native FIT can carry a lot
+    # more (cadence, power, running dynamics, per-lap data). Keeping the
+    # raw files around means a future parser enhancement can re-derive
+    # those fields for this whole import later without asking the user
+    # to re-upload their entire history again.
 
     _set_progress(
         user, state="done", imported=imported, skipped=skipped,
