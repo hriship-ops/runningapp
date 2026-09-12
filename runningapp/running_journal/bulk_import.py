@@ -42,6 +42,8 @@ from runningapp.running_journal.strava_sync import (
     compute_calories_met,
     compute_vdot,
     compute_trimp,
+    first_latlon,
+    get_location_details,
 )
 from runningapp.running_journal.garmin_sync import _is_duplicate
 
@@ -273,12 +275,32 @@ def _build_run_doc(user, settings, activity_type, date, run_name, distance_km, d
     effective_max_hr = settings["max_hr"] or max_hr_val or 0
     trimp = compute_trimp(avg_hr, duration_sec, settings["resting_hr"], effective_max_hr, settings["gender"])
 
+    # Same geocoding contract as garmin_sync.py/strava_sync.py: on a
+    # genuine failure (network/rate-limit) leave country/state/district
+    # out entirely (NULL, not "") so location_summary.backfill_geo_fields()
+    # picks this run up and retries it later, instead of it being
+    # permanently mislabeled as having no location. The 1-second pause
+    # is Nominatim's own usage-policy limit — harmless for a live sync's
+    # occasional call, but load-bearing here where hundreds of imported
+    # activities can be geocoded back-to-back in the same job.
+    location, geo = "", None
+    ll = first_latlon(route_points) if route_points else None
+    if ll:
+        try:
+            details = get_location_details(ll[0], ll[1])
+            location, geo = details["display"], details
+        except Exception:
+            pass
+        finally:
+            time.sleep(1)
+
     doc = {
         "doctype": "Run",
         "user": user,
         "run_name": run_name,
         "date": date,
         "activity_type": activity_type,
+        "location": location,
         "distance_km": distance_km,
         "duration_sec": duration_sec,
         "elevation_gain": elev_gain,
@@ -295,6 +317,10 @@ def _build_run_doc(user, settings, activity_type, date, run_name, distance_km, d
     if gear: doc["gear"] = gear
     if vdot: doc["vdot"] = vdot
     if trimp: doc["trimp"] = trimp
+    if geo is not None:
+        doc["country"] = geo["country"]
+        doc["state"] = geo["state"]
+        doc["district"] = geo["district"]
     if extra: doc.update(extra)
     return doc
 
@@ -402,7 +428,7 @@ def import_strava_export(file_url=None, extracted_dir=None, user=None):
     _set_progress(user, state="queued", imported=0, skipped=0, errors=0, no_file=0, total=0, processed=0)
     frappe.enqueue(
         "runningapp.running_journal.bulk_import._run_strava_export_job",
-        queue="long", timeout=3600, job_name=f"strava-export-import-{user}",
+        queue="long", timeout=21600, job_name=f"strava-export-import-{user}",
         extracted_dir=extracted_dir, user=user,
     )
     return {"queued": True}
@@ -531,7 +557,7 @@ def import_activity_files(file_urls=None, activity_type=None, user=None):
     _set_progress(user, state="queued", imported=0, skipped=0, errors=0, total=len(file_urls), processed=0)
     frappe.enqueue(
         "runningapp.running_journal.bulk_import._run_activity_files_job",
-        queue="long", timeout=3600, job_name=f"activity-files-import-{user}",
+        queue="long", timeout=21600, job_name=f"activity-files-import-{user}",
         file_urls=file_urls, activity_type=activity_type, user=user,
     )
     return {"queued": True}
