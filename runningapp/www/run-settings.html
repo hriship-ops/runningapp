@@ -302,7 +302,14 @@
         method: 'POST',
         headers: {'X-Frappe-CSRF-Token': RS_CSRF},
         body: fd
-      }).then(function(r) { return r.json(); }).then(function(res) { return res.message.file_url; });
+      }).then(function(r) {
+        if (r.status === 413) throw new Error('That file is too large for the server to accept.');
+        if (!r.ok) throw new Error('Upload failed (HTTP ' + r.status + ').');
+        return r.json();
+      }).then(function(res) {
+        if (!res.message || !res.message.file_url) throw new Error('Upload failed — no file was saved.');
+        return res.message.file_url;
+      });
     }
 
     var rsImportPollTimer = null;
@@ -353,9 +360,9 @@
           return;
         }
         rsPollImportProgress('');
-      }).catch(function() {
+      }).catch(function(err) {
         document.getElementById('rs-import-progress').style.display = 'none';
-        rsShowMsg('rs-import-msg', 'Import failed.', false);
+        rsShowMsg('rs-import-msg', (err && err.message) || 'Import failed.', false);
       });
     }
 
@@ -377,9 +384,9 @@
           return;
         }
         rsPollImportProgress('');
-      }).catch(function() {
+      }).catch(function(err) {
         document.getElementById('rs-import-progress').style.display = 'none';
-        rsShowMsg('rs-import-msg', 'Import failed.', false);
+        rsShowMsg('rs-import-msg', (err && err.message) || 'Import failed.', false);
       });
     }
 
