@@ -13,7 +13,9 @@ on every import path, not just Strava streams:
     crossing segment, instead of requiring a point within 5% of it, so
     downsampled tracks (~500 points) still produce results.
 
-Anything faster than 2:30/km is treated as a GPS glitch and ignored.
+GPS glitches: any hop between consecutive points faster than MAX_SPEED_MS
+(~2:23/km) adds no distance (time still runs), so a GPS jump can only make
+a segment slower, never faster. Segments faster than 2:30/km are dropped too.
 """
 
 import json
@@ -29,6 +31,7 @@ TARGETS = [
 ]
 FIELDS = [f for f, _ in TARGETS]
 MIN_SEC_PER_KM = 150  # 2:30/km
+MAX_SPEED_MS = 7.0  # faster point-to-point hops are GPS jumps
 
 
 def _haversine_m(a, b):
@@ -41,7 +44,7 @@ def _haversine_m(a, b):
 
 
 def _series(points):
-	"""[(cum_dist_m, t_sec)] with strictly increasing time and non-decreasing distance."""
+	"""[(cum_dist_m, t_sec)]: strictly increasing time, distance with GPS jumps removed."""
 	if not points:
 		return []
 	use_dst = sum(1 for p in points if p.get("dst") is not None) >= len(points) * 0.9
@@ -50,21 +53,20 @@ def _series(points):
 		t = p.get("t")
 		if t is None:
 			continue
+		t = float(t)
 		if use_dst:
-			d = p.get("dst")
-			if d is None:
+			if p.get("dst") is None:
 				continue
-			d = float(d)
-		else:
-			if p.get("lat") is None or p.get("lon") is None:
-				continue
-			if prev is not None:
-				cum += _haversine_m(prev, p)
-			prev = p
-			d = cum
-		if out and (t <= out[-1][1] or d < out[-1][0]):
+		elif p.get("lat") is None or p.get("lon") is None:
 			continue
-		out.append((d, float(t)))
+		if prev is not None:
+			if t <= prev[1]:
+				continue
+			step = (float(p["dst"]) - prev[0]) if use_dst else _haversine_m(prev[2], p)
+			if 0 < step <= MAX_SPEED_MS * (t - prev[1]):
+				cum += step
+		prev = (float(p["dst"]) if use_dst else 0.0, t, p)
+		out.append((cum, t))
 	return out
 
 
