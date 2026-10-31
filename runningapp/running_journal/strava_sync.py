@@ -21,6 +21,7 @@ Analytics formulae:
 """
 
 import frappe
+from runningapp.running_journal.best_efforts import compute_best_efforts
 import requests
 import json
 import math
@@ -445,6 +446,7 @@ def activity_to_run(activity, detail, streams, settings, user=None):
         "route_points":       json.dumps(route_points) if route_points else "",
     }
 
+    run_doc.update(compute_best_efforts(route_points, activity_type))
     if description:  run_doc["notes"] = description
     if gear_name:    run_doc["gear"]  = gear_name
     if vdot:         run_doc["vdot"]  = vdot

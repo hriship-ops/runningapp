@@ -27,6 +27,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 import frappe
+from runningapp.running_journal.best_efforts import compute_best_efforts
 from frappe.utils.password import get_decrypted_password
 
 from runningapp.running_journal.strava_sync import (
@@ -267,6 +268,7 @@ def activity_to_run(activity, points, settings, user):
         # no need for rebackfill_routes() to redo this one.
         "route_points_reflowed": 1,
     }
+    run_doc.update(compute_best_efforts(points, activity_type))
     if vdot:
         run_doc["vdot"] = vdot
     if trimp:
@@ -466,7 +468,7 @@ def rebackfill_routes():
     runs = frappe.get_all(
         "Run",
         filters={"garmin_id": ["!=", ""], "route_points_reflowed": 0},
-        fields=["name", "garmin_id"],
+        fields=["name", "garmin_id", "activity_type"],
         limit_page_length=REBACKFILL_MAX * 5,
     )
 
@@ -479,7 +481,8 @@ def rebackfill_routes():
         points = fetch_activity_route(client, run.garmin_id)
         frappe.db.set_value(
             "Run", run.name,
-            {"route_points": json.dumps(points) if points else "", "route_points_reflowed": 1},
+            {"route_points": json.dumps(points) if points else "", "route_points_reflowed": 1,
+             **compute_best_efforts(points, run.activity_type)},
             update_modified=False,
         )
         updated += 1

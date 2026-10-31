@@ -32,6 +32,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 import frappe
+from runningapp.running_journal.best_efforts import compute_best_efforts
 
 from runningapp.running_journal.strava_sync import (
     current_user,
@@ -326,6 +327,7 @@ def _build_run_doc(user, settings, activity_type, date, run_name, distance_km, d
         doc["country"] = geo["country"]
         doc["state"] = geo["state"]
         doc["district"] = geo["district"]
+    doc.update(compute_best_efforts(route_points, activity_type))
     if extra: doc.update(extra)
     return doc
 
