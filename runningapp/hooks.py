@@ -59,6 +59,11 @@ app_license = "mit"
 # application home page (will override Website Settings)
 home_page = "run-journal"
 
+# Send the bare domain to the journal URL (home_page above is the fallback).
+website_redirects = [
+	{"source": "/", "target": "/run-journal"},
+]
+
 # website user home page (by Role)
 # role_home_page = {
 # 	"Role": "home_page"
