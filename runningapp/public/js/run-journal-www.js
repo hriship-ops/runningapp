@@ -149,11 +149,35 @@ function rwLoadGeoSummary() {
     .catch(function() {});
 }
 
+/* All dashboard views share ONE download of the run list; filters are applied
+   in the browser. rwFetchAllRuns(true) forces a fresh download (e.g. after sync). */
+var rwRunsPromise = null;
+function rwFetchAllRuns(force) {
+    if (!rwRunsPromise || force) {
+        rwRunsPromise = fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify([])))
+        .then(function(r) { return r.json(); })
+        .then(function(data) { rwAllRuns = data.message || []; return rwAllRuns; })
+        .catch(function(e) { rwRunsPromise = null; throw e; });
+    }
+    return rwRunsPromise;
+}
+
+/* Same semantics as the server-side filters built by rwGetFilters(). */
+function rwApplyFilters(runs, filters) {
+    return runs.filter(function(r) {
+        return filters.every(function(f) {
+            var v = r[f[0]];
+            if (f[1] === '>=') return v >= f[2];
+            if (f[1] === '<=') return v <= f[2];
+            if (f[1] === '=')  return v === f[2];
+            return true;
+        });
+    });
+}
+
 function rwLoadAllRuns() {
-    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify([])))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        rwAllRuns = data.message || [];
+    rwFetchAllRuns(true)
+    .then(function() {
         var focused = rwFocusActivity ? rwAllRuns.filter(function(r) { return r.activity_type === rwFocusActivity; }) : rwAllRuns;
         rwRenderRecords(focused);
         rwRenderRecentRuns(focused);
@@ -252,20 +276,18 @@ function rwSetFocus(activity) {
 
 function rwLoadStats() {
     var filters = rwGetFilters();
-    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify(filters)))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        rwState.runs = data.message || [];
+    rwFetchAllRuns()
+    .then(function(all) {
+        rwState.runs = rwApplyFilters(all, filters);
         rwRenderStats(rwState.runs);
         rwRenderLabel();
     });
 }
 
 function rwLoadTicker() {
-    fetch('/api/method/runningapp.running_journal.doctype.run.run.get_all_runs?filters=' + encodeURIComponent(JSON.stringify([])))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        rwTickerRuns = data.message || [];
+    rwFetchAllRuns()
+    .then(function(all) {
+        rwTickerRuns = all;
         rwRenderTicker();
     });
 }
