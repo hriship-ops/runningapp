@@ -28,6 +28,7 @@ from datetime import datetime
 
 import frappe
 from runningapp.running_journal.best_efforts import compute_best_efforts
+from runningapp.running_journal import source_match
 from frappe.utils.password import get_decrypted_password
 
 from runningapp.running_journal.strava_sync import (
@@ -294,6 +295,7 @@ def sync_garmin(full_sync=False):
     client = get_garmin_client(user)
     settings = get_analytics_settings(user)
     imported = 0
+    linked = 0
     skipped = 0
     # Resume from where the last (possibly time-boxed) call left off, instead
     # of rescanning the whole history from the most recent activity every
@@ -332,8 +334,14 @@ def sync_garmin(full_sync=False):
             duration_sec = round(activity.get("duration", 0) or 0)
             start_date = (activity.get("startTimeLocal", "") or "")[:10]
 
-            if _is_duplicate(start_date, activity_type, distance_km, duration_sec, user):
-                skipped += 1
+            # Same workout already in the journal from Strava (Garmin auto-
+            # uploads there) or a bulk import? Link it instead of duplicating.
+            match = source_match.find_existing(
+                user, activity_type, start_date, distance_km, duration_sec, "garmin_id")
+            if match:
+                source_match.link(match, "garmin_id", garmin_id)
+                frappe.db.commit()
+                linked += 1
                 continue
 
             # No "skip if no GPS" here — pool swims, treadmill, and gym
@@ -366,7 +374,7 @@ def sync_garmin(full_sync=False):
         frappe.db.set_value(SETTINGS, user, CURSOR_FIELD, 0)
         frappe.db.set_value(SETTINGS, user, "garmin_last_sync", datetime.now())
     frappe.db.commit()
-    return {"imported": imported, "skipped": skipped, "more_pending": more_pending}
+    return {"imported": imported, "linked": linked, "skipped": skipped, "more_pending": more_pending}
 
 
 @frappe.whitelist(allow_guest=True)

@@ -22,10 +22,12 @@ Analytics formulae:
 
 import frappe
 from runningapp.running_journal.best_efforts import compute_best_efforts
+from runningapp.running_journal import source_match
 import requests
 import json
 import math
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
 SETTINGS = "Run Settings"
@@ -117,6 +119,8 @@ def get_valid_access_token(user=None):
             "grant_type":    "refresh_token"
         })
         tokens = r.json()
+        if "access_token" not in tokens:
+            frappe.throw("Strava connection has expired or was revoked - please reconnect Strava in Settings.")
         set_encrypted_password(SETTINGS, user, tokens["access_token"], "strava_access_token")
         set_encrypted_password(SETTINGS, user, tokens["refresh_token"], "strava_refresh_token")
         frappe.db.commit()
@@ -125,13 +129,20 @@ def get_valid_access_token(user=None):
 
 
 # ── API fetchers ──────────────────────────────────────────────────────────────
-def fetch_activities(per_page=50, page=1, user=None):
+def fetch_activities(per_page=50, page=1, user=None, after=None):
     token = get_valid_access_token(user)
+    params = {"per_page": per_page, "page": page}
+    if after:
+        params["after"] = int(after)
     r = requests.get(
         "https://www.strava.com/api/v3/activities",
         headers={"Authorization": f"Bearer {token}"},
-        params={"per_page": per_page, "page": page}
+        params=params,
     )
+    if r.status_code == 429:
+        frappe.throw("Strava rate limit reached - try again in 15 minutes.")
+    if r.status_code != 200:
+        frappe.throw(f"Strava API error {r.status_code}: {r.text[:200]}")
     return r.json()
 
 def fetch_activity_detail(activity_id, user=None):
@@ -463,22 +474,46 @@ def activity_to_run(activity, detail, streams, settings, user=None):
 
 
 # ── Sync ──────────────────────────────────────────────────────────────────────
+# Strava allows 100 requests / 15 min; each NEW activity costs 2-3 (detail +
+# streams), linking an existing one costs nothing extra. Bound each call like
+# Garmin sync does; the dashboard keeps calling while more_pending is true.
+STRAVA_MAX_IMPORTS_PER_CALL = 15
+STRAVA_TIME_BUDGET_SEC = 90
+# Normal syncs only look at activities from shortly before the newest
+# Strava-linked run (catches late uploads/edits); full_sync scans everything.
+STRAVA_LOOKBACK_DAYS = 14
+
+
+def _strava_after_ts(user):
+    last = frappe.db.sql(
+        "select max(date) from `tabRun` where user=%s and ifnull(strava_id, '') != ''", user
+    )[0][0]
+    if not last:
+        return None
+    return int(datetime.combine(last - timedelta(days=STRAVA_LOOKBACK_DAYS), datetime.min.time()).timestamp())
+
+
 @frappe.whitelist()
 def sync_strava(full_sync=False):
     user = current_user()
     settings = get_analytics_settings(user)
-    imported = 0
-    skipped  = 0
-    page     = 1
+    imported = linked = skipped = 0
+    page = 1
+    more_pending = False
+    t_start = time.monotonic()
+    after = None if int(full_sync or 0) else _strava_after_ts(user)
 
     while True:
-        activities = fetch_activities(per_page=50, page=page, user=user)
+        activities = fetch_activities(per_page=50, page=page, user=user, after=after)
         if not activities or not isinstance(activities, list):
             break
 
         for activity in activities:
-            strava_id = str(activity.get("id", ""))
+            if imported >= STRAVA_MAX_IMPORTS_PER_CALL or (time.monotonic() - t_start) > STRAVA_TIME_BUDGET_SEC:
+                more_pending = True
+                break
 
+            strava_id = str(activity.get("id", ""))
             if frappe.db.exists("Run", {"strava_id": strava_id, "user": user}):
                 skipped += 1
                 continue
@@ -487,7 +522,31 @@ def sync_strava(full_sync=False):
                 skipped += 1
                 continue
 
-            # Fetch detail and streams for every new activity
+            # Already in the journal via Garmin (which auto-uploads to Strava)
+            # or a bulk import? Link it instead of importing a duplicate.
+            match = None
+            garmin_id = source_match.garmin_id_from_strava(activity)
+            if garmin_id:
+                r = frappe.db.get_value("Run", {"garmin_id": garmin_id, "user": user},
+                                        ["name", "strava_id"], as_dict=True)
+                if r and not r.strava_id:
+                    match = r.name
+            if not match:
+                match = source_match.find_existing(
+                    user,
+                    TYPE_MAP[activity["type"]],
+                    (activity.get("start_date_local") or "")[:10],
+                    round((activity.get("distance", 0) or 0) / 1000, 3),
+                    activity.get("moving_time", 0) or 0,
+                    "strava_id",
+                )
+            if match:
+                source_match.link(match, "strava_id", strava_id)
+                frappe.db.commit()
+                linked += 1
+                continue
+
+            # Genuinely new: fetch detail and streams
             detail  = fetch_activity_detail(activity["id"], user=user)
             streams = {}
             if activity.get("start_latlng"):
@@ -496,15 +555,17 @@ def sync_strava(full_sync=False):
             run_data = activity_to_run(activity, detail, streams, settings, user=user)
             run = frappe.get_doc(run_data)
             run.insert(ignore_permissions=True)
+            frappe.db.commit()
             imported += 1
 
-        if len(activities) < 50:
+        if more_pending or len(activities) < 50:
             break
         page += 1
 
-    frappe.db.set_value(SETTINGS, user, "strava_last_sync", datetime.now())
+    if not more_pending:
+        frappe.db.set_value(SETTINGS, user, "strava_last_sync", datetime.now())
     frappe.db.commit()
-    return {"imported": imported, "skipped": skipped}
+    return {"imported": imported, "linked": linked, "skipped": skipped, "more_pending": more_pending}
 
 
 @frappe.whitelist(allow_guest=True)
