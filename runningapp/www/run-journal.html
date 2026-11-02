@@ -20,7 +20,6 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="rw-btn-import" id="rw-sync-garmin-btn" onclick="rwSync('garmin')" style="display:none">&#8635; Sync Garmin</button>
-        <button class="rw-btn-import" id="rw-sync-strava-btn" onclick="rwSync('strava')" style="display:none">&#8635; Sync Strava</button>
         <a class="rw-btn-import" id="rw-settings-btn" href="/run-settings" style="display:none;background:#374151;text-decoration:none">&#9881; Settings</a>
         <button class="rw-btn-import" id="rw-login-btn" onclick="rwShowLogin()" style="background:#374151">&#128274; Login</button>
         <button class="rw-btn-import" id="rw-logout-btn" onclick="rwLogout()" style="display:none;background:#374151">&#128275; Logout</button>
@@ -192,13 +191,9 @@
         var user = data.message;
         if (user && user !== 'Guest') {
           document.getElementById('rw-sync-garmin-btn').style.display = '';
-          document.getElementById('rw-sync-strava-btn').style.display = '';
           document.getElementById('rw-settings-btn').style.display = '';
           document.getElementById('rw-login-btn').style.display = 'none';
           document.getElementById('rw-logout-btn').style.display = '';
-          // run-journal-www.js loads at the end of the page; wait for it if needed
-          if (window.rwInitStrava) rwInitStrava();
-          else document.addEventListener('DOMContentLoaded', function() { rwInitStrava(); });
         }
       });
 

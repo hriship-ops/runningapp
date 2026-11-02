@@ -23,8 +23,6 @@
     .rs-row > .rs-field { flex:1; }
     .rs-btn { background:#3b82f6; color:#fff; border:none; padding:10px 16px; border-radius:6px; font-size:14px; cursor:pointer; }
     .rs-btn:hover { background:#2563eb; }
-    .rs-btn-strava { background:#fc4c02; }
-    .rs-btn-strava:hover { background:#e04400; }
     .rs-btn-danger { background:#374151; color:#f87171; border:1px solid #4b5563; }
     .rs-btn-danger:hover { background:#4b5563; }
     .rs-status { display:inline-flex; align-items:center; gap:6px; font-size:13px; margin-bottom:14px; }
@@ -71,16 +69,6 @@
         </div>
         <button class="rs-btn" onclick="rsSaveGarmin()">Save</button>
         <div class="rs-msg" id="rs-garmin-msg"></div>
-      </div>
-
-      <!-- STRAVA -->
-      <div class="rs-card">
-        <div class="rs-card-title">Strava</div>
-        <div class="rs-card-sub">Connect your own Strava account — you'll be redirected to Strava to approve access.</div>
-        <div class="rs-status"><span class="rs-dot off" id="rs-strava-dot"></span><span id="rs-strava-status">Not connected</span></div>
-        <button class="rs-btn rs-btn-strava" id="rs-strava-connect-btn" onclick="rsConnectStrava()">Connect with Strava</button>
-        <button class="rs-btn rs-btn-danger" id="rs-strava-disconnect-btn" onclick="rsDisconnectStrava()" style="display:none">Disconnect</button>
-        <div class="rs-msg" id="rs-strava-msg"></div>
       </div>
 
       <!-- PROFILE -->
@@ -134,7 +122,7 @@
       <!-- BULK IMPORT -->
       <div class="rs-card">
         <div class="rs-card-title">Bulk Import</div>
-        <div class="rs-card-sub">Already have your history as files? Import it directly instead of syncing — no Garmin/Strava login needed.</div>
+        <div class="rs-card-sub">Already have your history as files? Import it directly instead of syncing — no login needed.</div>
 
         <div class="rs-field">
           <label class="rs-label">Strava export (.zip from Settings &rsaquo; My Account &rsaquo; Download or Delete Your Account &rsaquo; Request Your Archive)</label>
@@ -222,12 +210,6 @@
           }
         });
 
-        var params = new URLSearchParams(location.search);
-        var strava = params.get('strava');
-        if (strava === 'connected') rsShowMsg('rs-strava-msg', 'Strava connected!', true);
-        if (strava === 'denied') rsShowMsg('rs-strava-msg', 'Strava connection was cancelled.', false);
-        if (strava === 'error') rsShowMsg('rs-strava-msg', 'Strava connection failed — try again.', false);
-        if (strava) history.replaceState(null, '', '/run-settings');
       });
 
     function rsLoadSettings() {
@@ -246,11 +228,6 @@
         document.getElementById('rs-garmin-status').textContent = gOn ? 'Connected' : 'Not connected';
         document.getElementById('rs-garmin-pw-hint').style.display = gOn ? 'inline' : 'none';
 
-        var sOn = !!d.strava_connected;
-        document.getElementById('rs-strava-dot').className = 'rs-dot ' + (sOn ? 'on' : 'off');
-        document.getElementById('rs-strava-status').textContent = sOn ? 'Connected' : 'Not connected';
-        document.getElementById('rs-strava-connect-btn').style.display = sOn ? 'none' : 'inline-block';
-        document.getElementById('rs-strava-disconnect-btn').style.display = sOn ? 'inline-block' : 'none';
       });
     }
 
@@ -278,22 +255,6 @@
       rsApi('runningapp.running_journal.settings_api.save_my_settings', payload).then(function() {
         rsShowMsg('rs-profile-msg', 'Saved.', true);
       }).catch(function() { rsShowMsg('rs-profile-msg', 'Save failed.', false); });
-    }
-
-    function rsConnectStrava() {
-      rsApi('runningapp.running_journal.strava_oauth.authorize_url', {next: '/run-settings'}).then(function(res) {
-        if (res.message) { window.location.href = res.message; return; }
-        var err = 'Could not start the Strava connection.';
-        try { if (res._server_messages) err = JSON.parse(JSON.parse(res._server_messages)[0]).message; } catch (e) {}
-        rsShowMsg('rs-strava-msg', err, false);
-      });
-    }
-
-    function rsDisconnectStrava() {
-      rsApi('runningapp.running_journal.strava_oauth.disconnect').then(function() {
-        rsShowMsg('rs-strava-msg', 'Disconnected.', true);
-        rsLoadSettings();
-      });
     }
 
     function rsUploadFile(file) {

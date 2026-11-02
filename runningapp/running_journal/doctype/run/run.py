@@ -1,6 +1,6 @@
 import frappe, json, os, re, time
 from frappe.model.document import Document
-from runningapp.running_journal.strava_sync import current_user
+from runningapp.running_journal.common import current_user
 
 class Run(Document):
     pass

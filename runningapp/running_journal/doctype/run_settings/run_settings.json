@@ -16,11 +16,6 @@
   "default_activity",
   "pace_format",
   "calories_formula",
-  "strava_athlete_id",
-  "strava_access_token",
-  "strava_refresh_token",
-  "strava_token_expires",
-  "strava_last_sync",
   "resting_hr",
   "max_hr_override",
   "date_of_birth",
@@ -86,35 +81,6 @@
    "options": "MET\nSimple"
   },
   {
-   "fieldname": "strava_athlete_id",
-   "fieldtype": "Data",
-   "label": "Strava Athlete ID",
-   "read_only": 1
-  },
-  {
-   "fieldname": "strava_access_token",
-   "fieldtype": "Password",
-   "label": "Strava Access Token",
-   "read_only": 1
-  },
-  {
-   "fieldname": "strava_refresh_token",
-   "fieldtype": "Password",
-   "label": "Strava Refresh Token",
-   "read_only": 1
-  },
-  {
-   "fieldname": "strava_token_expires",
-   "fieldtype": "Datetime",
-   "label": "Strava Token Expires",
-   "read_only": 1
-  },
-  {
-   "fieldname": "strava_last_sync",
-   "fieldtype": "Datetime",
-   "label": "Strava Last Sync"
-  },
-  {
    "fieldname": "resting_hr",
    "fieldtype": "Int",
    "label": "Resting HR (bpm)"
@@ -154,7 +120,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-21 20:03:12.986011",
+ "modified": "2026-11-02 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Running Journal",
  "name": "Run Settings",

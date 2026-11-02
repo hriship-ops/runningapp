@@ -2,7 +2,7 @@
 settings_api.py
 ----------------
 Backs the /run-settings page: the logged-in user's own profile fields,
-Garmin credentials, and Strava connection status. Every call is scoped
+Garmin credentials. Every call is scoped
 to frappe.session.user (never current_user()'s Guest->default-owner
 fallback — a settings page only ever makes sense for a real logged-in
 person).
@@ -11,7 +11,7 @@ person).
 import frappe
 from frappe.utils.password import get_decrypted_password
 
-from runningapp.running_journal.strava_sync import SETTINGS, ensure_settings_doc
+from runningapp.running_journal.common import SETTINGS, ensure_settings_doc
 
 PROFILE_FIELDS = [
     "weight_kg", "age", "gender", "resting_heart_rate", "units",
@@ -38,11 +38,6 @@ def get_my_settings():
     )
     data["garmin_last_sync"] = doc.garmin_last_sync
 
-    data["strava_connected"] = bool(
-        get_decrypted_password(SETTINGS, user, "strava_access_token", raise_exception=False)
-    )
-    data["strava_athlete_id"] = doc.strava_athlete_id or ""
-    data["strava_last_sync"] = doc.strava_last_sync
 
     return data
 

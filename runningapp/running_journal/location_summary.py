@@ -3,7 +3,7 @@ location_summary.py
 --------------------
 Country/state/district breakdown of everywhere the athlete has run, for the
 dashboard's drill-down cards. Country/state/district come from Nominatim's
-own structured address fields via strava_sync.get_location_details().
+own structured address fields via common.get_location_details().
 """
 
 import json
@@ -11,7 +11,7 @@ import time
 
 import frappe
 
-from runningapp.running_journal.strava_sync import get_location_details, first_latlon, current_user, home_location
+from runningapp.running_journal.common import get_location_details, first_latlon, current_user, home_location
 
 SETTINGS = "Run Settings"
 

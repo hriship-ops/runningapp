@@ -31,7 +31,7 @@ from runningapp.running_journal.best_efforts import compute_best_efforts
 from runningapp.running_journal import source_match
 from frappe.utils.password import get_decrypted_password
 
-from runningapp.running_journal.strava_sync import (
+from runningapp.running_journal.common import (
     get_analytics_settings,
     compute_age,
     get_location_details,

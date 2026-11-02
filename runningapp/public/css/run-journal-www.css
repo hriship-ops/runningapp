@@ -11,8 +11,6 @@ body { margin:0; background:#111827; }
 .rw-logo-sub { font-size:11px; color:#9ca3af; margin-top:1px; }
 .rw-btn-import { font-size:11px; color:#d1d5db; background:#374151; border:1px solid #4b5563; border-radius:6px; padding:6px 12px; cursor:pointer; }
 .rw-btn-import:hover { background:#4b5563; }
-.rw-btn-import.rw-btn-strava { background:#fc4c02; border-color:#fc4c02; color:#fff; font-weight:600; }
-.rw-btn-import.rw-btn-strava:hover { background:#e04400; }
 
 /* LOCATION SUMMARY */
 .rw-geo-section { background:#1f2937; border-bottom:1px solid #374151; padding:14px 24px; }

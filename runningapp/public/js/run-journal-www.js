@@ -727,16 +727,13 @@ function rwTickerPrev() {
     if (rwState.tickerPage > 0) { rwState.tickerPage--; rwRenderTicker(); }
 }
 
-/* ── SYNC (Garmin / Strava) ──
-   Garmin auto-uploads to Strava, so the same workout can arrive from both.
-   The server links it to the existing run instead of duplicating it and
-   reports it as "linked". Each call is time-boxed; we keep calling while the
-   server says more_pending. */
+/* ── GARMIN SYNC ──
+   If the workout is already in the journal (e.g. from a Strava export import)
+   the server links it instead of duplicating it and reports it as "linked".
+   Each call is time-boxed; we keep calling while the server says more_pending. */
 var RW_SYNC = {
     garmin: { label: 'Garmin', btn: 'rw-sync-garmin-btn',
-              url: '/api/method/runningapp.running_journal.garmin_sync.sync_garmin_public' },
-    strava: { label: 'Strava', btn: 'rw-sync-strava-btn',
-              url: '/api/method/runningapp.running_journal.strava_sync.sync_strava_public' }
+              url: '/api/method/runningapp.running_journal.garmin_sync.sync_garmin_public' }
 };
 
 function rwSyncOnce(src) {
@@ -778,59 +775,6 @@ function rwSync(src) {
     }
 
     step().then(function() { done(); })
-    .catch(function(err) {
-        var msg = err && err.message ? err.message : 'unknown error';
-        if (src === 'strava' && /reconnect strava/i.test(msg)) {
-            if (btn) { btn.textContent = idle; btn.disabled = false; }
-            rwSetStravaConnected(false);
-            if (confirm('Your Strava connection has expired. Reconnect now?')) rwConnectStrava();
-            return;
-        }
-        done(msg);
-    });
+    .catch(function(err) { done(err && err.message ? err.message : 'unknown error'); });
 }
 
-/* ── STRAVA CONNECT (click-through OAuth, like Runalyze) ──
-   Button sends you to Strava's consent screen; Strava sends you back here
-   with ?strava=connected and the first sync starts automatically. */
-function rwConnectStrava() {
-    fetch('/api/method/runningapp.running_journal.strava_oauth.authorize_url?next=' + encodeURIComponent('/run-journal'))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.message) window.location.href = data.message;
-        else alert("Strava isn't set up on this site yet.");
-    })
-    .catch(function() { alert('Could not reach the server - try again.'); });
-}
-
-function rwSetStravaConnected(connected) {
-    var btn = document.getElementById('rw-sync-strava-btn');
-    if (!btn) return;
-    if (connected) {
-        btn.textContent = '↻ Sync Strava';
-        btn.classList.remove('rw-btn-strava');
-        btn.onclick = function() { rwSync('strava'); };
-    } else {
-        btn.textContent = 'Connect with Strava';
-        btn.classList.add('rw-btn-strava');
-        btn.onclick = rwConnectStrava;
-    }
-}
-
-/* Called by the page once it knows a user is logged in. */
-function rwInitStrava() {
-    var params = new URLSearchParams(window.location.search);
-    var result = params.get('strava');
-    if (result) history.replaceState(null, '', window.location.pathname);
-
-    fetch('/api/method/runningapp.running_journal.settings_api.get_my_settings')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        var connected = !!(data.message && data.message.strava_connected);
-        rwSetStravaConnected(connected);
-        if (result === 'connected') rwSync('strava');
-        else if (result === 'denied') alert('Strava connection was cancelled.');
-        else if (result === 'error') alert('Strava connection failed - please try again.');
-    })
-    .catch(function() {});
-}

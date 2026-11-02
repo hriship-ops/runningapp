@@ -14,7 +14,7 @@ Two entry points:
   import_strava_export()  -- the CSV + activities/ folder layout
   import_activity_files()  -- a flat list of loose TCX/FIT/GPX files, no CSV
 
-Both are per-user (same `user` scoping as garmin_sync.py/strava_sync.py)
+Both are per-user (same `user` scoping as garmin_sync.py)
 and share garmin_sync's cross-source dedup (_is_duplicate), so re-running
 an import, or importing files for activities already synced live via the
 Garmin/Strava API, doesn't create duplicates.
@@ -34,7 +34,7 @@ from datetime import datetime
 import frappe
 from runningapp.running_journal.best_efforts import compute_best_efforts
 
-from runningapp.running_journal.strava_sync import (
+from runningapp.running_journal.common import (
     current_user,
     get_analytics_settings,
     compute_age,
@@ -276,7 +276,7 @@ def _build_run_doc(user, settings, activity_type, date, run_name, distance_km, d
     effective_max_hr = settings["max_hr"] or max_hr_val or 0
     trimp = compute_trimp(avg_hr, duration_sec, settings["resting_hr"], effective_max_hr, settings["gender"])
 
-    # Same geocoding contract as garmin_sync.py/strava_sync.py: on a
+    # Same geocoding contract as garmin_sync.py: on a
     # genuine failure (network/rate-limit) leave country/state/district
     # out entirely (NULL, not "") so location_summary.backfill_geo_fields()
     # picks this run up and retries it later, instead of it being
