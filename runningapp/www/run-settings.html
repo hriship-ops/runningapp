@@ -281,9 +281,11 @@
     }
 
     function rsConnectStrava() {
-      rsApi('runningapp.running_journal.strava_oauth.authorize_url').then(function(res) {
-        if (res.message) window.location.href = res.message;
-        else rsShowMsg('rs-strava-msg', 'Strava isn\'t set up on this site yet.', false);
+      rsApi('runningapp.running_journal.strava_oauth.authorize_url', {next: '/run-settings'}).then(function(res) {
+        if (res.message) { window.location.href = res.message; return; }
+        var err = 'Could not start the Strava connection.';
+        try { if (res._server_messages) err = JSON.parse(JSON.parse(res._server_messages)[0]).message; } catch (e) {}
+        rsShowMsg('rs-strava-msg', err, false);
       });
     }
 
