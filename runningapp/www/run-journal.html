@@ -196,6 +196,9 @@
           document.getElementById('rw-settings-btn').style.display = '';
           document.getElementById('rw-login-btn').style.display = 'none';
           document.getElementById('rw-logout-btn').style.display = '';
+          // run-journal-www.js loads at the end of the page; wait for it if needed
+          if (window.rwInitStrava) rwInitStrava();
+          else document.addEventListener('DOMContentLoaded', function() { rwInitStrava(); });
         }
       });
 
